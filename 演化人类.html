@@ -1,0 +1,2812 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>演化人类 — 13角色沙盒</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --text: #eee;
+      --accent: #00cec9;
+      --panel-w: 240px;
+      --font-base: clamp(11px, 1.1vw, 15px);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: var(--font-base);
+      background: var(--bg); color: var(--text);
+    }
+    .screen {
+      position: fixed; inset: 0; display: none;
+      flex-direction: column; align-items: center; justify-content: center; z-index: 1;
+    }
+    .screen.active { display: flex; }
+    #screen-menu h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 0.75rem; letter-spacing: 0.12em;
+      color: #ffffff; font-weight: 700;
+      text-shadow: 0 2px 20px rgba(0, 206, 201, 0.45), 0 0 40px rgba(255, 255, 255, 0.15);
+    }
+    #screen-menu .menu-subtitle { color: #b2bec3; margin: 0 0 1.5rem; font-size: 0.95rem; }
+    .btn {
+      cursor: pointer; border: none; padding: 0.65rem 1.5rem;
+      font-size: 1rem; border-radius: 8px; color: var(--text);
+      transition: transform 0.15s, background 0.15s;
+    }
+    .btn:hover:not(:disabled) { transform: scale(1.04); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #0984e3);
+      font-size: 1.4rem; padding: 0.9rem 2.5rem;
+      box-shadow: 0 4px 20px rgba(0,206,201,0.35);
+    }
+    .btn-secondary { background: #2d3436; }
+    .btn-tool { background: rgba(45,52,54,0.92); padding: 0.35rem 0.7rem; font-size: 0.8rem; margin: 0 0.2rem; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    #screen-count { overflow-y: auto; padding: 1.5rem; justify-content: flex-start; padding-top: 3rem; }
+    #screen-count h2 { margin-bottom: 1rem; }
+    #count-input {
+      width: 72px; padding: 0.45rem; font-size: 1.1rem; text-align: center;
+      border: 2px solid #555; border-radius: 6px; background: #16213e; color: var(--text);
+    }
+    #count-input.shake { animation: shake 0.4s; border-color: #d63031; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
+    }
+    .count-hint { color: #d63031; min-height: 1.2em; margin: 0.4rem 0; }
+    .quick-btns, .preset-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; max-width: 720px; margin: 0.6rem 0; }
+    .preset-btns .btn { font-size: 0.75rem; padding: 0.4rem 0.65rem; }
+    .noise-row { margin: 1rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    #screen-game { padding: 0; justify-content: flex-start; }
+    #btn-esc {
+      position: fixed; top: 10px; right: calc(var(--panel-w) + 12px); z-index: 50;
+      padding: 0.4rem 0.8rem; font-weight: bold; background: rgba(45,52,54,0.95);
+      border: 1px solid #636e72; border-radius: 6px; color: var(--text); cursor: pointer; display: none;
+    }
+    #btn-esc.visible { display: block; }
+    #btn-esc:hover { border-color: var(--accent); background: rgba(0,206,201,0.2); }
+    #game-topbar {
+      position: fixed; top: 0; left: 0; right: var(--panel-w); height: 44px;
+      display: flex; align-items: center; justify-content: center; z-index: 10;
+      background: linear-gradient(180deg, rgba(26,26,46,0.95), transparent);
+    }
+    #tool-bar {
+      position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
+      z-index: 10; display: flex; gap: 0.3rem;
+    }
+    #arena-wrap {
+      position: fixed; left: 0; right: var(--panel-w); top: 76px; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #arena { position: relative; width: min(78vw, calc(100vh - 100px)); height: min(78vh, calc(100vw - var(--panel-w) - 100px)); max-width: 880px; max-height: 680px; }
+    #arena-scaler { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transform-origin: center; }
+    #circle-container { position: relative; width: 100%; height: 100%; transition: transform 0.3s ease; }
+    #lines-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+    .slot {
+      position: absolute; width: 60px; height: 60px; border-radius: 50%;
+      border: 2px solid #444; background: transparent;
+      transform: translate(-50%, -50%); z-index: 5;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .slot.highlight { border-color: #fff; animation: slot-pulse 0.8s ease infinite; }
+    @keyframes slot-pulse {
+      0%,100%{box-shadow:0 0 8px rgba(255,255,255,0.4)}
+      50%{box-shadow:0 0 14px rgba(255,255,255,0.85)}
+    }
+    .slot .ball-wrap { width: 100%; height: 100%; }
+    .score-label {
+      position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      font-size: 0.65rem; color: #aaa; margin-top: 3px; white-space: nowrap; display: none;
+    }
+    .slot.has-score .score-label { display: block; }
+    .float-score {
+      position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+      font-weight: bold; font-size: 0.95rem; color: #00b894; pointer-events: none; z-index: 20;
+      animation: float-up 0.8s ease forwards;
+    }
+    .float-score.neg { color: #d63031; }
+    .float-score.zero { color: #95a5a6; }
+    @keyframes float-up {
+      0%{opacity:1;transform:translateX(-50%) translateY(0)}
+      100%{opacity:0;transform:translateX(-50%) translateY(-30px)}
+    }
+    .slot.dying .ball-wrap, .slot.replace-die .ball-wrap { animation: die 0.55s forwards; }
+    @keyframes die { to { transform: scale(0) rotate(180deg); filter: brightness(0.5); } }
+    .slot.birthing .ball-wrap { animation: birth 0.55s cubic-bezier(0.68,-0.55,0.265,1.55) forwards; }
+    @keyframes birth { from{transform:scale(0)} to{transform:scale(1)} }
+    #btn-evolve {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 120px; height: 120px; border-radius: 50%; border: none;
+      background: #00cec9; color: #1a1a2e; font-size: 1.2rem; font-weight: bold;
+      cursor: pointer; z-index: 15; display: none;
+      animation: pulse-evolve 2s ease infinite;
+    }
+    #btn-evolve.visible { display: block; }
+    @keyframes pulse-evolve {
+      0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 0 rgba(0,206,201,0.5)}
+      50%{transform:translate(-50%,-50%) scale(1.05);box-shadow:0 0 24px 8px rgba(0,206,201,0.25)}
+    }
+    #unit-panel {
+      position: fixed; right: 0; top: 0; bottom: 0; width: var(--panel-w);
+      background: rgba(20,20,30,0.92); backdrop-filter: blur(8px);
+      z-index: 20; transition: transform 0.4s ease; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    #unit-panel.collapsed { transform: translateY(calc(-100% + 32px)); }
+    #panel-tab {
+      position: absolute; bottom: -32px; left: 0; right: 0; height: 32px;
+      background: rgba(20,20,30,0.95); text-align: center; line-height: 32px;
+      cursor: pointer; font-size: 0.8rem; display: none;
+    }
+    #unit-panel.collapsed #panel-tab { display: block; }
+    #panel-title { text-align: center; padding: 0.45rem; border-bottom: 1px solid #333; font-size: 0.9rem; flex-shrink: 0; }
+    #palette-list {
+      flex: 1; overflow-y: auto; padding: 0.5rem;
+      display: flex; flex-direction: column; gap: 0.55rem; align-items: center;
+    }
+    .palette-unit { text-align: center; cursor: grab; user-select: none; }
+    .palette-unit .name { font-size: 12px; color: #fff; margin-top: 2px; }
+    .drag-ghost {
+      position: fixed; pointer-events: none; z-index: 9999; opacity: 0.65;
+      transform: translate(-50%, -50%);
+    }
+    #tooltip {
+      position: fixed; max-width: 300px; padding: 8px 10px;
+      background: rgba(30,30,40,0.95); border-radius: 6px; z-index: 10001;
+      pointer-events: none; display: none; line-height: 1.45; font-size: 0.8rem;
+      border: 1px solid #555;
+    }
+    #tooltip .tip-title { font-weight: bold; margin-bottom: 4px; }
+    #tooltip .tip-persona { color: #b2bec3; margin-bottom: 4px; }
+    #tooltip .tip-logic { color: #dfe6e9; font-size: 0.75rem; }
+    #esc-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 100; display: none; align-items: center; justify-content: center;
+    }
+    #esc-overlay.open { display: flex; }
+    #esc-menu {
+      background: #16213e; border-radius: 12px; padding: 1.5rem;
+      min-width: 280px; display: flex; flex-direction: column; gap: 0.6rem;
+    }
+    #esc-menu h3 { text-align: center; }
+    .esc-hint { font-size: 0.72rem; color: #aaa; text-align: center; }
+    #save-slots-panel { display: none; flex-direction: column; gap: 0.4rem; }
+    #save-slots-panel.open { display: flex; }
+    .save-slot-btn {
+      padding: 0.5rem; text-align: left; background: #2d3436; border: 2px solid transparent;
+      border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.8rem;
+    }
+    .save-slot-btn.has-data { border-color: var(--accent); }
+    .save-slot-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .line-fade { animation: line-fade 0.8s forwards; }
+    @keyframes line-fade { 0%,70%{opacity:1} 100%{opacity:0} }
+
+    /* ===== Role ball base ===== */
+    .role-ball {
+      position: relative; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .role-ball.size-60 { width: 60px; height: 60px; }
+    .role-ball.size-40 { width: 40px; height: 40px; }
+    .role-emoji { position: relative; z-index: 2; line-height: 1; pointer-events: none; }
+    .role-ball.size-60 .role-emoji { font-size: 24px; }
+    .role-ball.size-40 .role-emoji { font-size: 16px; }
+
+    .role-cooperator { background: #FF6B6B; box-shadow: 0 0 12px rgba(255,107,107,0.5); }
+    .role-cheater { background: #4ECDC4; }
+    .role-cheater::after {
+      content: ''; position: absolute; width: 8px; border-top: 2px solid #2d3436;
+      transform: rotate(25deg); right: 22%; bottom: 28%; z-index: 3;
+    }
+    .role-ball.size-40.role-cheater::after { right: 18%; bottom: 26%; width: 6px; }
+    .role-sucker { background: #96CEB4; }
+    .role-sucker .deco-q {
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      font-size: 14px; opacity: 0.7; animation: float-q 2s infinite alternate; z-index: 3;
+    }
+    .role-ball.size-40 .deco-q { font-size: 11px; top: -11px; }
+    @keyframes float-q { from{transform:translateX(-50%) translateY(0)} to{transform:translateX(-50%) translateY(-3px)} }
+    .role-copycat { background: #FFEAA7; }
+    .role-copycat::before, .role-copycat::after {
+      content: ''; position: absolute; width: 10px; height: 6px; top: 50%;
+      border: 2px solid transparent; border-top: 2px solid #fdcb6e; border-radius: 50%; z-index: 1;
+    }
+    .role-copycat::before { left: -2px; transform: translateY(-50%) rotate(-30deg); }
+    .role-copycat::after { right: -2px; transform: translateY(-50%) rotate(30deg); border-top-color: #fdcb6e; width: 10px; height: 6px; background: none; bottom: auto; }
+    .role-ball.size-40.role-copycat::before, .role-ball.size-40.role-copycat::after { width: 7px; height: 4px; }
+    .role-grudger { background: #DDA0DD; box-shadow: inset 0 -4px 4px rgba(0,0,0,0.15); }
+    .role-grudger .deco-vein { position: absolute; top: 6px; font-size: 12px; transform: scale(0.5); z-index: 3; }
+    .role-ball.size-40 .deco-vein { top: 2px; font-size: 10px; }
+    .role-detective { background: #FF7675; }
+    .role-detective .hat {
+      position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+      width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent;
+      border-bottom: 12px solid #2d3436; z-index: 4;
+    }
+    .role-ball.size-40 .hat { border-left-width: 6px; border-right-width: 6px; border-bottom-width: 9px; top: -8px; }
+    .role-detective .pipe-stem {
+      position: absolute; width: 3px; height: 8px; background: #8B4513;
+      left: 18%; bottom: 22%; transform: rotate(-30deg); z-index: 3;
+    }
+    .role-detective .pipe-bowl {
+      position: absolute; width: 4px; height: 4px; background: #8B4513; border-radius: 50%;
+      left: 14%; bottom: 18%; z-index: 3;
+    }
+    .role-detective .mustache-l, .role-detective .mustache-r {
+      position: absolute; width: 6px; height: 3px; background: #6d4c41; border-radius: 50%;
+      bottom: 38%; z-index: 3;
+    }
+    .role-detective .mustache-l { left: 32%; transform: rotate(20deg); }
+    .role-detective .mustache-r { right: 32%; transform: rotate(-20deg); }
+    .role-detective .brow-l, .role-detective .brow-r {
+      position: absolute; width: 4px; height: 2px; background: #2d3436; top: 32%; z-index: 3;
+    }
+    .role-detective .brow-l { left: 28%; transform: rotate(25deg); }
+    .role-detective .brow-r { right: 28%; transform: rotate(-25deg); }
+    .role-pavlov {
+      background: #A29BFE;
+      padding: 2px;
+      background: conic-gradient(from 0deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #ff6b6b);
+    }
+    .role-pavlov .pavlov-inner { width: 100%; height: 100%; border-radius: 50%; background: #A29BFE; display: flex; align-items: center; justify-content: center; position: relative; }
+    .role-pavlov .deco-arrows { position: absolute; top: -12px; font-size: 14px; color: #fff; z-index: 3; }
+    .role-ball.size-40 .deco-arrows { font-size: 11px; top: -10px; }
+    .role-generous { background: #FDCB6E; }
+    .role-generous .halo {
+      position: absolute; width: 70px; height: 70px; border: 2px solid #fdcb6e;
+      border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 0;
+    }
+    .role-ball.size-40 .halo { width: 46px; height: 46px; }
+    .role-generous .deco-heart { position: absolute; bottom: -2px; transform: scale(0.5); z-index: 3; }
+    .role-titfortwo { background: #74B9FF; }
+    .role-titfortwo .badge-2 {
+      position: absolute; top: -8px; width: 16px; height: 16px; border-radius: 50%;
+      background: #0984e3; color: #fff; font-size: 10px;
+      display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 3;
+    }
+    .role-ball.size-40 .badge-2 { width: 12px; height: 12px; font-size: 8px; top: -6px; }
+    .role-conformist { background: #00B894; }
+    .role-conformist .eye-arrow-l {
+      position: absolute; left: 22%; top: 38%; width: 0; height: 0;
+      border-right: 4px solid #fff; border-top: 3px solid transparent; border-bottom: 3px solid transparent;
+    }
+    .role-conformist .eye-arrow-r {
+      position: absolute; right: 22%; top: 38%; width: 0; height: 0;
+      border-left: 4px solid #fff; border-top: 3px solid transparent; border-bottom: 3px solid transparent;
+    }
+    .role-fair { background: #E17055; }
+    .role-fair .leaf-l, .role-fair .leaf-r {
+      position: absolute; font-size: 14px; transform: scale(0.4); z-index: 3;
+    }
+    .role-fair .leaf-l { left: -4px; top: 50%; transform: scale(0.4) rotate(45deg); }
+    .role-fair .leaf-r { right: -4px; top: 50%; transform: scale(0.4) rotate(-45deg); }
+    .role-prober { background: #636E72; }
+    .role-prober .mask {
+      position: absolute; width: 36px; height: 8px; background: #2d3436;
+      border-radius: 2px; top: 38%; left: 50%; transform: translateX(-50%); z-index: 3;
+    }
+    .role-ball.size-40 .mask { width: 26px; height: 6px; }
+    .role-prober .dagger {
+      position: absolute; right: 4px; top: 50%; transform: translateY(-50%) rotate(-45deg); z-index: 3;
+    }
+    .role-prober .dagger-blade {
+      width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent;
+      border-bottom: 10px solid #b2bec3; margin: 0 auto;
+    }
+    .role-prober .dagger-handle { width: 3px; height: 4px; background: #636e72; margin: 0 auto; }
+    .role-joker { background: #B2BEC3; border: 2px dashed #fff; animation: joker-spin 4s linear infinite; }
+    @keyframes joker-spin { to { transform: rotate(360deg); } }
+    .role-joker .joker-inner { animation: joker-spin-rev 4s linear infinite; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+    @keyframes joker-spin-rev { to { transform: rotate(-360deg); } }
+    .role-joker .jq, .role-joker .je {
+      position: absolute; font-size: 12px; opacity: 0; animation: joker-blink 2s infinite; z-index: 3;
+    }
+    .role-joker .je { animation-delay: 0.5s; }
+    @keyframes joker-blink { 0%,45%{opacity:0} 55%,100%{opacity:0.85} }
+
+    /* ===== Main menu (3 entries) ===== */
+    .menu-entries { display: flex; flex-direction: column; gap: 1rem; width: min(360px, 90vw); }
+    .menu-entry {
+      padding: 1rem 1.5rem; font-size: 1.15rem; border-radius: 10px;
+      border: 2px solid #636e72; background: #16213e; cursor: pointer; text-align: center;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      color: #f5f6fa; font-weight: 600;
+    }
+    .menu-entry:hover:not(.locked) { border-color: var(--accent); transform: scale(1.02); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+    .menu-entry.locked { opacity: 0.5; cursor: not-allowed; color: #888; font-weight: normal; }
+    .menu-entry.recommended {
+      border-color: #fdcb6e;
+      background: linear-gradient(135deg, rgba(253, 203, 110, 0.22), rgba(0, 206, 201, 0.18));
+      color: #ffffff;
+      box-shadow: 0 0 22px rgba(253, 203, 110, 0.35), inset 0 0 0 1px rgba(253, 203, 110, 0.25);
+    }
+    .menu-entry.recommended:hover { border-color: #ffeaa7; box-shadow: 0 0 28px rgba(253, 203, 110, 0.45); }
+    .menu-entry .menu-star { color: #fdcb6e; margin-right: 0.35rem; }
+    .menu-entry .menu-hint { display: block; font-size: 0.72rem; font-weight: normal; color: #dfe6e9; margin-top: 0.35rem; opacity: 0.95; }
+
+    /* ===== Classroom map ===== */
+    #screen-classroom-map { overflow-y: auto; padding: 2rem 1rem; justify-content: flex-start; }
+    #screen-classroom-map h2 { margin-bottom: 0.5rem; }
+    .map-back { position: fixed; top: 12px; left: 12px; z-index: 5; }
+    .map-chapter { margin: 1.5rem 0; max-width: 900px; width: 100%; }
+    .map-chapter h3 { font-size: 0.95rem; color: #aaa; margin-bottom: 0.75rem; border-left: 3px solid var(--accent); padding-left: 0.5rem; }
+    .map-nodes { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
+    .map-node {
+      width: 72px; padding: 0.5rem 0.35rem; border-radius: 10px; text-align: center;
+      cursor: pointer; border: 2px solid #555; background: #16213e; font-size: 0.75rem;
+      transition: transform 0.15s, border-color 0.2s;
+    }
+    .map-node:hover:not(.locked) { transform: scale(1.05); }
+    .map-node.locked { opacity: 0.4; cursor: not-allowed; }
+    .map-node.unlocked { border-color: var(--node-color, var(--accent)); background: transparent; }
+    .map-node.done { background: var(--node-color, var(--accent)); color: #1a1a2e; border-color: var(--node-color); }
+    .map-node.done.wrong { background: var(--node-color); opacity: 0.85; }
+    .map-node .node-icon { font-size: 1.1rem; display: block; margin-bottom: 2px; }
+
+    /* ===== Story acts ===== */
+    #screen-story { background: var(--bg); padding: 2rem; overflow-y: auto; }
+    .story-act { display: none; max-width: 720px; width: 100%; flex-direction: column; align-items: center; text-align: center; }
+    .story-act.active { display: flex; }
+    .story-title { font-size: clamp(1.6rem, 4vw, 2.2rem); margin-bottom: 1.5rem; font-weight: bold; }
+    .story-body { font-size: 18px; line-height: 1.8; color: #f0f0f0; text-align: left; margin-bottom: 2rem; }
+    .story-body p { margin-bottom: 1rem; }
+    .story-body h3 { color: #00cec9; font-size: 1.05rem; margin: 1.25rem 0 0.5rem; }
+    .story-body ul { margin: 0.5rem 0 1rem 1.25rem; }
+    .story-body li { margin-bottom: 0.45rem; }
+    .story-body .rules-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1rem; font-size: 0.95rem; }
+    .story-body .rules-table th, .story-body .rules-table td { border: 1px solid #555; padding: 0.45rem 0.6rem; text-align: center; }
+    .story-body .rules-table th { background: rgba(0,206,201,0.15); color: #00cec9; }
+    .story-prelude-text, .story-bridge-text {
+      font-size: clamp(1.35rem, 3vw, 1.75rem); line-height: 1.8; color: #fff;
+      margin: 2rem 0 2.5rem; font-style: italic; text-align: center;
+    }
+    .story-next { margin-top: auto; }
+    #screen-classroom-map h2 { color: #fff; font-weight: 700; }
+    #screen-classroom-map .map-desc { color: #dfe6e9 !important; }
+    .cast-row { display: flex; flex-wrap: wrap; gap: 1.25rem; justify-content: center; margin: 1.5rem 0 2rem; }
+    .cast-item {
+      text-align: center; width: min(200px, 44vw); max-width: 220px;
+      padding: 0.75rem; background: rgba(22, 33, 62, 0.85); border-radius: 10px;
+      border: 1px solid #444;
+    }
+    .cast-item .cast-name { font-size: 0.9rem; margin-top: 0.4rem; font-weight: 600; color: #fff; }
+    .cast-item .cast-role { font-size: 0.72rem; color: #00cec9; margin-top: 0.2rem; }
+    .cast-item .cast-behavior {
+      font-size: 0.75rem; color: #b2bec3; line-height: 1.5; margin-top: 0.5rem;
+      text-align: left; padding-top: 0.45rem; border-top: 1px solid #444;
+    }
+    .cast-hint { font-size: 0.85rem; color: #b2bec3; margin: 0 0 1rem; line-height: 1.5; }
+    .palette-unit .codex-behavior {
+      font-size: 0.68rem; color: #b2bec3; line-height: 1.4; margin-top: 0.35rem;
+      text-align: left; padding: 0 0.25rem; max-width: 200px;
+    }
+    .bet-question { font-size: clamp(1.1rem, 2.5vw, 1.4rem); line-height: 1.6; margin-bottom: 1.5rem; }
+    .bet-options { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-bottom: 1.5rem; }
+    .bet-card {
+      min-width: 140px; max-width: 200px; padding: 1rem; border-radius: 12px;
+      border: 2px solid #555; background: #16213e; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .bet-card:hover { border-color: #888; }
+    .bet-card.selected { border-color: var(--bet-color, var(--accent)); box-shadow: 0 0 16px rgba(0,206,201,0.35); }
+    .bet-card .bet-label { font-size: 0.9rem; margin-top: 0.5rem; }
+
+    /* ===== Classroom game mode ===== */
+    #screen-game.classroom-mode #btn-esc,
+    #screen-game.classroom-mode #tool-bar { display: none !important; }
+    #screen-game.classroom-mode #unit-panel { pointer-events: auto; }
+    #screen-game.classroom-mode .palette-unit { cursor: help; }
+    #screen-game.classroom-mode .slot.filled { pointer-events: auto; cursor: help; }
+    #screen-game.classroom-mode #circle-container { pointer-events: auto; }
+    #screen-game.classroom-mode #arena-wrap { right: var(--panel-w); }
+    .classroom-bar {
+      position: fixed; top: 44px; left: 0; right: var(--panel-w);
+      display: none; align-items: center; justify-content: center; gap: 0.75rem;
+      flex-wrap: wrap; z-index: 11; padding: 0.35rem;
+    }
+    #screen-game.classroom-mode .classroom-bar { display: flex; }
+    .classroom-bar label { font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem; }
+    #btn-classroom-exit { font-size: 0.8rem; }
+
+    /* ===== Reveal modal ===== */
+    #reveal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #reveal-overlay.open { display: flex; }
+    #reveal-modal {
+      width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+      background: #2d3436; border-radius: 16px; padding: 32px;
+    }
+    #reveal-modal h2 { font-size: 1.35rem; margin-bottom: 1rem; }
+    #reveal-modal .reveal-story, #reveal-modal .reveal-theory {
+      font-size: 16px; line-height: 1.8; margin-bottom: 1rem; color: #dfe6e9;
+    }
+    #reveal-modal .reveal-divider { border: none; border-top: 1px solid #555; margin: 1.25rem 0; }
+    #reveal-modal .reveal-ask { font-size: 1.5rem; text-align: center; margin: 1rem 0; font-weight: bold; }
+    #reveal-modal .reveal-feedback { text-align: center; font-size: 1.05rem; margin-bottom: 1.25rem; }
+    #reveal-modal .reveal-feedback.correct { color: #00b894; }
+    #reveal-modal .reveal-feedback.wrong { color: #ff7675; }
+    #reveal-modal .reveal-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+    #btn-evolve.reveal-ready { animation: pulse-evolve 1.2s ease infinite; }
+
+    #rules-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 150;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #rules-overlay.open { display: flex; }
+    #rules-modal-box {
+      width: 560px; max-width: 95vw; max-height: 88vh; overflow-y: auto;
+      background: #2d3436; border-radius: 14px; padding: 1.5rem 1.75rem;
+      border: 1px solid #555;
+    }
+    #rules-modal-box h2 { color: #00cec9; margin-bottom: 1rem; }
+    #screen-count h2 { color: #fff; font-weight: 600; }
+    #dominance-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.82); z-index: 120;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #dominance-overlay.open { display: flex; }
+    #dominance-box {
+      text-align: center; padding: 2rem 2.5rem; background: #2d3436;
+      border-radius: 16px; border: 2px solid var(--accent); max-width: 480px;
+    }
+    #dominance-text {
+      font-size: clamp(1.4rem, 4vw, 2rem); color: #fff; font-weight: 700;
+      margin-bottom: 1.5rem; line-height: 1.5;
+    }
+    #btn-reveal-next:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    #prediction-timer-wrap { display: flex; justify-content: center; margin: 0.75rem 0 1.25rem; }
+    #prediction-timer {
+      position: relative; width: 60px; height: 60px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #prediction-timer .timer-text {
+      position: relative; z-index: 1; font-size: 1.1rem; font-weight: 700; color: #00cec9;
+    }
+    #prediction-timer .timer-ring { position: absolute; inset: 0; }
+    #prediction-timer.warn .timer-text { color: #ff7675; }
+    #prediction-timer.warn .timer-ring { animation: timer-pulse 0.8s ease infinite; }
+    @keyframes timer-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    .bet-card.auto-picked { animation: bet-pick 0.35s ease; }
+    @keyframes bet-pick {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+      100% { transform: scale(1); }
+    }
+
+    .btn-audio-toggle {
+      position: fixed; right: 1rem; bottom: 1rem; z-index: 200;
+      width: 44px; height: 44px; border-radius: 50%; border: 1px solid #555;
+      background: rgba(45, 52, 54, 0.92); color: #fff; font-size: 1.25rem;
+      cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+    }
+    .btn-audio-toggle:hover { border-color: #00cec9; }
+    #esc-menu .btn-audio-toggle { position: static; margin-top: 0.75rem; width: 100%; border-radius: 8px; height: auto; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div id="screen-menu" class="screen active">
+    <h1>演化人类</h1>
+    <p class="menu-subtitle">博弈论思维实验 · 选择模式开始</p>
+    <div class="menu-entries" id="main-menu-entries"></div>
+    <button type="button" class="btn-audio-toggle" id="btn-audio-menu" title="音乐开关">🔊</button>
+  </div>
+
+  <div id="screen-classroom-map" class="screen">
+    <button type="button" class="btn btn-secondary map-back" id="btn-map-back">← 主菜单</button>
+    <h2>经典课堂</h2>
+    <p class="map-desc" style="margin-bottom:1rem">读故事 · 做预测 · 看演变 · 揭晓答案</p>
+    <div id="classroom-map-chapters"></div>
+  </div>
+
+  <div id="screen-story" class="screen">
+    <div id="story-rules" class="story-act">
+      <h1 class="story-title" style="color:#00cec9">演化规则说明</h1>
+      <div class="story-body" id="story-rules-body"></div>
+      <button type="button" class="btn btn-primary story-next" id="btn-rules-ok">我明白了 →</button>
+    </div>
+    <div id="story-prelude" class="story-act">
+      <p class="story-prelude-text">那么，我们的故事就此开始……</p>
+      <button type="button" class="btn btn-primary story-next" id="btn-prelude-next">进入本课故事 →</button>
+    </div>
+    <div id="story-lesson2-bridge" class="story-act">
+      <p class="story-bridge-text">你应该已经完全了解这里的演变规则了吧，那么我们开始下一个故事。</p>
+      <button type="button" class="btn btn-primary story-next" id="btn-lesson2-next">继续 →</button>
+    </div>
+    <div id="story-bg" class="story-act">
+      <h1 class="story-title" id="story-bg-title"></h1>
+      <div class="story-body" id="story-bg-body"></div>
+      <button type="button" class="btn btn-primary story-next" id="btn-story-cast">认识角色 →</button>
+    </div>
+    <div id="story-cast" class="story-act">
+      <h2 class="story-title" style="font-size:1.4rem">角色登场</h2>
+      <p class="cast-hint">以下为故事中出现的角色及其<strong>博弈行为规则</strong>（与右侧图鉴、圆环上的角色一致）。</p>
+      <div class="cast-row" id="story-cast-row"></div>
+      <button type="button" class="btn btn-primary story-next" id="btn-story-bet">做出预测 →</button>
+    </div>
+    <div id="story-bet" class="story-act">
+      <p class="bet-question" id="story-bet-question"></p>
+      <div id="prediction-timer-wrap">
+        <div id="prediction-timer">
+          <svg class="timer-ring" width="60" height="60" aria-hidden="true">
+            <circle class="timer-bg" cx="30" cy="30" r="28" stroke="#444" stroke-width="4" fill="none"/>
+            <circle class="timer-progress" cx="30" cy="30" r="28" stroke="#00CEC9" stroke-width="4" fill="none"
+              stroke-dasharray="175.9" stroke-dashoffset="0" transform="rotate(-90 30 30)"/>
+          </svg>
+          <span class="timer-text">50</span>
+        </div>
+      </div>
+      <div class="bet-options" id="story-bet-options"></div>
+      <button type="button" class="btn btn-primary story-next" id="btn-story-start" style="display:none">开始演变</button>
+    </div>
+  </div>
+
+  <div id="screen-count" class="screen">
+    <h2>选择参与者人数</h2>
+    <div class="count-row" style="display:flex;gap:0.5rem;align-items:center">
+      <label for="count-input">人数：</label>
+      <input type="number" id="count-input" min="1" max="36" value="10">
+    </div>
+    <p class="count-hint" id="count-hint"></p>
+    <div class="quick-btns">
+      <button type="button" class="btn btn-secondary quick-count" data-n="5">5 人</button>
+      <button type="button" class="btn btn-secondary quick-count" data-n="10">10 人</button>
+      <button type="button" class="btn btn-secondary quick-count" data-n="25">25 人</button>
+      <button type="button" class="btn btn-secondary quick-count" data-n="36">36 人</button>
+    </div>
+    <button type="button" class="btn btn-secondary" id="btn-sandbox-rules" style="margin:0.5rem 0">查看游戏规则</button>
+    <label class="noise-row"><input type="checkbox" id="noise-toggle"> 开启噪声（5% 误触）</label>
+    <p style="font-size:0.8rem;color:#888;margin-bottom:0.5rem">预设阵容（按当前人数裁剪/填充）</p>
+    <div class="preset-btns" id="preset-btns"></div>
+    <button type="button" class="btn btn-primary" id="btn-generate" style="margin-top:1rem">生成圆环</button>
+  </div>
+
+  <div id="screen-game" class="screen">
+    <button type="button" id="btn-esc" title="菜单 Esc">ESC</button>
+    <div id="game-topbar"><span id="round-display">准备阶段</span></div>
+    <div class="classroom-bar" id="classroom-bar">
+      <label><input type="checkbox" id="classroom-auto"> 自动演变</label>
+      <button type="button" class="btn btn-tool" id="btn-classroom-pause" style="display:none">暂停</button>
+      <button type="button" class="btn btn-tool" id="btn-classroom-skip">跳过动画</button>
+      <button type="button" class="btn btn-tool" id="btn-classroom-exit">退出到地图</button>
+      <button type="button" class="btn btn-tool" id="btn-classroom-rules">规则回顾</button>
+    </div>
+    <div id="tool-bar">
+      <button type="button" class="btn btn-tool" id="btn-clear">清空圆环</button>
+      <button type="button" class="btn btn-tool" id="btn-random">随机填充</button>
+      <button type="button" class="btn btn-tool" id="btn-game-rules">游戏规则</button>
+    </div>
+    <div id="arena-wrap">
+      <div id="arena">
+        <div id="arena-scaler">
+          <div id="circle-container"><svg id="lines-svg"></svg></div>
+          <button type="button" id="btn-evolve">▶ 演变</button>
+        </div>
+      </div>
+    </div>
+    <aside id="unit-panel">
+      <div id="panel-tab">▼ 展开工具栏</div>
+      <div id="panel-title">13 种策略</div>
+      <div id="palette-list"></div>
+    </aside>
+  </div>
+
+  <div id="tooltip"></div>
+  <div id="esc-overlay">
+    <div id="esc-menu">
+      <h3>菜单</h3>
+      <p class="esc-hint">存档保存在本机浏览器（5 档位）</p>
+      <button type="button" class="btn btn-secondary esc-action" data-action="resume">继续游戏</button>
+      <button type="button" class="btn btn-secondary esc-action" data-action="save">保存进度</button>
+      <button type="button" class="btn btn-secondary esc-action" data-action="load">读取进度</button>
+      <button type="button" class="btn btn-secondary esc-action" data-action="quit">退出到主菜单</button>
+      <button type="button" class="btn-audio-toggle" id="btn-audio-esc" title="音乐开关">🔊</button>
+      <div id="save-slots-panel"></div>
+    </div>
+  </div>
+
+  <div id="dominance-overlay">
+    <div id="dominance-box">
+      <p id="dominance-text"></p>
+      <button type="button" class="btn btn-primary" id="btn-dominance-ok">知道了</button>
+    </div>
+  </div>
+
+  <div id="rules-overlay">
+    <div id="rules-modal-box">
+      <h2>演化规则说明</h2>
+      <div class="story-body" id="rules-modal-body"></div>
+      <button type="button" class="btn btn-primary" id="btn-rules-close" style="margin-top:1rem;width:100%">关闭</button>
+    </div>
+  </div>
+
+  <div id="reveal-overlay">
+    <div id="reveal-modal">
+      <h2 id="reveal-title"></h2>
+      <p class="reveal-story" id="reveal-story"></p>
+      <p class="reveal-theory" id="reveal-theory"></p>
+      <hr class="reveal-divider">
+      <p class="reveal-ask">你猜对了吗？</p>
+      <p class="reveal-feedback" id="reveal-feedback"></p>
+      <div class="reveal-actions">
+        <button type="button" class="btn btn-secondary" id="btn-reveal-map">返回地图</button>
+        <button type="button" class="btn btn-secondary" id="btn-reveal-replay">再玩一次</button>
+        <button type="button" class="btn btn-primary" id="btn-reveal-next">下一关</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ===== RoleVisuals ===== */
+const RoleVisuals = {
+  roles: {
+    cooperator: { id:'cooperator', name:'合作者', nameEn:'Cooperator', color:'#FF6B6B', emoji:'🤝',
+      persona:'永远的老好人', logic:'对每位邻居永远出合作（C）。',
+      decos:[] },
+    cheater: { id:'cheater', name:'骗子', nameEn:'Cheater', color:'#4ECDC4', emoji:'😏',
+      persona:'精明的利己主义者', logic:'对每位邻居永远出背叛（D）。', decos:[] },
+    sucker: { id:'sucker', name:'傻子', nameEn:'Sucker', color:'#96CEB4', emoji:'🥺',
+      persona:'天真的奉献者', logic:'对每位邻居永远出合作（C）。', decos:['deco-q'] },
+    copycat: { id:'copycat', name:'复读机', nameEn:'Copycat', color:'#FFEAA7', emoji:'🦜',
+      persona:'以牙还牙', logic:'第1轮C；之后复制该邻居上一轮对我的动作（oppAction）。', decos:[] },
+    grudger: { id:'grudger', name:'记仇者', nameEn:'Grudger', color:'#DDA0DD', emoji:'😤',
+      persona:'一次背叛，终身绝交', logic:'第1轮C；历史中若邻居曾对我出D，则永远D。', decos:['deco-vein'] },
+    detective: { id:'detective', name:'侦探', nameEn:'Detective', color:'#FF7675', emoji:'🧐',
+      persona:'试探后定型', logic:'每邻居独立：第1-4轮 C,D,C,C；若4轮内曾被背叛→复读机，否则→骗子。', decos:['hat','pipe-stem','pipe-bowl','mustache-l','mustache-r','brow-l','brow-r'] },
+    pavlov: { id:'pavlov', name:'墙头草', nameEn:'Pavlov', color:'#A29BFE', emoji:'🦎',
+      persona:'赢则固守，输则改变', logic:'第1轮C；上一轮得分≥2则保持上轮动作，否则翻转。', decos:['pavlov-inner','deco-arrows'] },
+    generous_copycat: { id:'generous_copycat', name:'大善人', nameEn:'Generous Copycat', color:'#FDCB6E', emoji:'😇',
+      persona:'宽容的复读机', logic:'第1轮C；邻居上轮C则C；上轮D则90%D、10%原谅出C。', decos:['halo','deco-heart'] },
+    tit_for_two_tats: { id:'tit_for_two_tats', name:'老好人', nameEn:'Tit-for-Two-Tats', color:'#74B9FF', emoji:'😌',
+      persona:'宽容两次才反击', logic:'第1轮C；仅当邻居连续两轮对我D时我才D，否则C。', decos:['badge-2'] },
+    conformist: { id:'conformist', name:'跟风狗', nameEn:'Conformist', color:'#00B894', emoji:'🐑',
+      persona:'随大流', logic:'第1轮C；之后根据左/右邻居上轮对我的动作，D数≥C数则两轮都D，否则都C。', decos:['eye-arrow-l','eye-arrow-r'] },
+    firm_but_fair: { id:'firm_but_fair', name:'和事佬', nameEn:'Firm-But-Fair', color:'#E17055', emoji:'🤗',
+      persona:'强硬但公平', logic:'记仇值grudge：>0则D并减1；=0时邻居上轮D则D且grudge=1，否则C。', decos:['leaf-l','leaf-r'] },
+    prober: { id:'prober', name:'试探者', nameEn:'Prober', color:'#636E72', emoji:'🥷',
+      persona:'先下手为强', logic:'第1轮D试探；若邻居前两轮都C则永远D，若第2轮报复则变复读机。', decos:['mask','dagger'] },
+    joker: { id:'joker', name:'混沌', nameEn:'Joker', color:'#B2BEC3', emoji:'🎲',
+      persona:'无法预测', logic:'每轮对每个邻居独立随机50% C或D，不读历史。', decos:['joker-inner','jq','je'] }
+  },
+
+  getRoleIds() { return Object.keys(this.roles); },
+
+  createBall(roleId, size = 60) {
+    const r = this.roles[roleId];
+    if (!r) return document.createElement('div');
+    const sz = size === 40 ? 'size-40' : 'size-60';
+    const ball = document.createElement('div');
+    ball.className = `role-ball role-${roleId} ${sz}`;
+    ball.dataset.role = roleId;
+
+    if (roleId === 'pavlov') {
+      const inner = document.createElement('div');
+      inner.className = 'pavlov-inner';
+      const em = document.createElement('span');
+      em.className = 'role-emoji';
+      em.textContent = r.emoji;
+      inner.appendChild(em);
+      ball.appendChild(inner);
+      const ar = document.createElement('span');
+      ar.className = 'deco-arrows';
+      ar.textContent = '↔';
+      ball.appendChild(ar);
+      return ball;
+    }
+    if (roleId === 'joker') {
+      const inner = document.createElement('div');
+      inner.className = 'joker-inner';
+      const em = document.createElement('span');
+      em.className = 'role-emoji';
+      em.textContent = r.emoji;
+      inner.appendChild(em);
+      ball.appendChild(inner);
+      const jq = document.createElement('span');
+      jq.className = 'jq';
+      jq.textContent = '❓';
+      const je = document.createElement('span');
+      je.className = 'je';
+      je.textContent = '❕';
+      ball.appendChild(jq);
+      ball.appendChild(je);
+      return ball;
+    }
+    if (roleId === 'prober') {
+      const em = document.createElement('span');
+      em.className = 'role-emoji';
+      em.textContent = r.emoji;
+      ball.appendChild(em);
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      ball.appendChild(mask);
+      const dag = document.createElement('div');
+      dag.className = 'dagger';
+      dag.innerHTML = '<div class="dagger-blade"></div><div class="dagger-handle"></div>';
+      ball.appendChild(dag);
+      return ball;
+    }
+    if (roleId === 'generous_copycat') {
+      const halo = document.createElement('div');
+      halo.className = 'halo';
+      ball.appendChild(halo);
+    }
+    if (roleId === 'sucker') {
+      const q = document.createElement('span');
+      q.className = 'deco-q';
+      q.textContent = '❓';
+      ball.appendChild(q);
+    }
+    if (roleId === 'grudger') {
+      const v = document.createElement('span');
+      v.className = 'deco-vein';
+      v.textContent = '💢';
+      ball.appendChild(v);
+    }
+    if (roleId === 'detective') {
+      ['hat','pipe-stem','pipe-bowl','mustache-l','mustache-r','brow-l','brow-r'].forEach(cls => {
+        const d = document.createElement('div');
+        d.className = cls;
+        ball.appendChild(d);
+      });
+    }
+    if (roleId === 'tit_for_two_tats') {
+      const b = document.createElement('div');
+      b.className = 'badge-2';
+      b.textContent = '2';
+      ball.appendChild(b);
+    }
+    if (roleId === 'conformist') {
+      const al = document.createElement('div');
+      al.className = 'eye-arrow-l';
+      const ar = document.createElement('div');
+      ar.className = 'eye-arrow-r';
+      ball.appendChild(al);
+      ball.appendChild(ar);
+    }
+    if (roleId === 'firm_but_fair') {
+      const ll = document.createElement('span');
+      ll.className = 'leaf-l';
+      ll.textContent = '🌿';
+      const lr = document.createElement('span');
+      lr.className = 'leaf-r';
+      lr.textContent = '🌿';
+      ball.appendChild(ll);
+      ball.appendChild(lr);
+    }
+    if (roleId === 'generous_copycat') {
+      const h = document.createElement('span');
+      h.className = 'deco-heart';
+      h.textContent = '❤️';
+      ball.appendChild(h);
+    }
+
+    const emoji = document.createElement('span');
+    emoji.className = 'role-emoji';
+    emoji.textContent = r.emoji;
+    ball.appendChild(emoji);
+    return ball;
+  }
+};
+
+const SAVE_PREFIX = 'trustEvolution_v2_';
+const SAVE_SLOTS = 5;
+const DETECTIVE_PROBE = ['C','D','C','C'];
+
+/* ===== GameState ===== */
+class GameState {
+  constructor() {
+    this.playerCount = 0;
+    this.nodes = [];
+    this.round = 0;
+    this.roundScores = [];
+    this.cumulativeScores = [];
+    this.noiseEnabled = false;
+    this.histories = new Map();
+    this.grudgeMap = new Map();
+    this.pendingPreset = null;
+  }
+
+  static pairKey(i, j) { return `${i}_${j}`; }
+
+  reset(count) {
+    this.playerCount = count;
+    this.nodes = Array(count).fill(null);
+    this.round = 0;
+    this.roundScores = [];
+    this.cumulativeScores = Array(count).fill(0);
+    this.histories = new Map();
+    this.grudgeMap = new Map();
+  }
+
+  isFull() { return this.nodes.length > 0 && this.nodes.every(n => n !== null); }
+
+  static monocultureRole(state) {
+    if (!state.isFull()) return null;
+    const types = new Set(state.nodes);
+    return types.size === 1 ? [...types][0] : null;
+  }
+
+  left(i) { return (i - 1 + this.playerCount) % this.playerCount; }
+  right(i) { return (i + 1) % this.playerCount; }
+
+  getHistory(i, j) {
+    return this.histories.get(GameState.pairKey(i, j)) || [];
+  }
+
+  getGrudge(i, j) {
+    return this.grudgeMap.get(GameState.pairKey(i, j)) || 0;
+  }
+
+  serialize() {
+    return {
+      playerCount: this.playerCount,
+      nodes: [...this.nodes],
+      round: this.round,
+      roundScores: this.roundScores.map(r => [...r]),
+      cumulativeScores: [...this.cumulativeScores],
+      noiseEnabled: this.noiseEnabled,
+      histories: [...this.histories.entries()],
+      grudgeMap: [...this.grudgeMap.entries()]
+    };
+  }
+
+  deserialize(data) {
+    this.playerCount = data.playerCount;
+    this.nodes = [...data.nodes];
+    this.round = data.round || 0;
+    this.roundScores = (data.roundScores || []).map(r => [...r]);
+    this.cumulativeScores = data.cumulativeScores || Array(this.playerCount).fill(0);
+    this.noiseEnabled = !!data.noiseEnabled;
+    this.histories = new Map(data.histories || []);
+    this.grudgeMap = new Map(data.grudgeMap || []);
+  }
+}
+
+/* ===== SaveManager ===== */
+class SaveManager {
+  constructor(refs) { this.refs = refs; }
+  slotKey(i) { return SAVE_PREFIX + i; }
+  listSlots() {
+    const slots = [];
+    for (let i = 0; i < SAVE_SLOTS; i++) {
+      const raw = localStorage.getItem(this.slotKey(i));
+      slots.push(raw ? JSON.parse(raw) : null);
+    }
+    return slots;
+  }
+  save(slotIndex, state) {
+    localStorage.setItem(this.slotKey(slotIndex), JSON.stringify({ timestamp: Date.now(), ...state.serialize() }));
+  }
+  formatTime(ts) {
+    return new Date(ts).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }
+  renderSlotButtons(mode, onSelect) {
+    const panel = this.refs.saveSlotsPanel;
+    panel.innerHTML = '';
+    panel.classList.add('open');
+    const slots = this.listSlots();
+    for (let i = 0; i < SAVE_SLOTS; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'save-slot-btn';
+      const data = slots[i];
+      if (data) {
+        btn.classList.add('has-data');
+        btn.textContent = `档位 ${i+1} — ${this.formatTime(data.timestamp)} — ${data.playerCount}人 第${data.round}轮`;
+      } else btn.textContent = `档位 ${i+1} — 空`;
+      if (mode === 'load' && !data) btn.disabled = true;
+      btn.addEventListener('click', () => {
+        if (mode === 'load' && !data) return;
+        onSelect(i, data);
+        panel.classList.remove('open');
+      });
+      panel.appendChild(btn);
+    }
+  }
+}
+
+/* ===== StrategyLogic ===== */
+class StrategyLogic {
+  static decide(roleType, neighborId, history, currentRound, ctx) {
+    const key = GameState.pairKey(ctx.playerIndex, neighborId);
+    switch (roleType) {
+      case 'cooperator':
+      case 'sucker':
+        return 'C';
+      case 'cheater':
+        return 'D';
+      case 'copycat':
+        return history.length === 0 ? 'C' : history[history.length - 1].oppAction;
+      case 'grudger':
+        if (history.length === 0) return 'C';
+        if (history.some(h => h.oppAction === 'D')) return 'D';
+        return 'C';
+      case 'detective':
+        return StrategyLogic.detective(history);
+      case 'pavlov':
+        if (history.length === 0) return 'C';
+        const last = history[history.length - 1];
+        if (last.myScore >= 2) return last.myAction;
+        return last.myAction === 'C' ? 'D' : 'C';
+      case 'generous_copycat':
+        if (history.length === 0) return 'C';
+        const lo = history[history.length - 1].oppAction;
+        if (lo === 'C') return 'C';
+        return Math.random() < 0.1 ? 'C' : 'D';
+      case 'tit_for_two_tats':
+        if (history.length === 0) return 'C';
+        if (history.length >= 2) {
+          const a = history[history.length - 2].oppAction;
+          const b = history[history.length - 1].oppAction;
+          if (a === 'D' && b === 'D') return 'D';
+        }
+        return 'C';
+      case 'firm_but_fair':
+        return StrategyLogic.firmButFair(key, history, ctx);
+      case 'prober':
+        return StrategyLogic.prober(history);
+      case 'joker':
+        return Math.random() < 0.5 ? 'C' : 'D';
+      default:
+        return 'C';
+    }
+  }
+
+  static detective(history) {
+    if (history.length < 4) return DETECTIVE_PROBE[history.length];
+    const first4 = history.slice(0, 4);
+    if (first4.some(h => h.oppAction === 'D')) {
+      return history.length ? history[history.length - 1].oppAction : 'C';
+    }
+    return 'D';
+  }
+
+  static prober(history) {
+    if (history.length === 0) return 'D';
+    if (history.length >= 2) {
+      if (history[0].oppAction === 'C' && history[1].oppAction === 'C') return 'D';
+      if (history[1].oppAction === 'D') {
+        return history[history.length - 1].oppAction;
+      }
+    }
+    if (history.length === 1) return 'D';
+    return 'D';
+  }
+
+  static firmButFair(key, history, ctx) {
+    let g = ctx.grudgeMap.get(key) || 0;
+    if (g > 0) {
+      ctx.grudgeMap.set(key, g - 1);
+      return 'D';
+    }
+    if (history.length === 0) return 'C';
+    const last = history[history.length - 1];
+    if (last.oppAction === 'D') {
+      ctx.grudgeMap.set(key, 1);
+      return 'D';
+    }
+    return 'C';
+  }
+
+  static conformistAction(playerIndex, state) {
+    if (state.round === 0) return 'C';
+    const L = state.left(playerIndex);
+    const R = state.right(playerIndex);
+    const hL = state.getHistory(playerIndex, L);
+    const hR = state.getHistory(playerIndex, R);
+    const lastL = hL.length ? hL[hL.length - 1].oppAction : 'C';
+    const lastR = hR.length ? hR[hR.length - 1].oppAction : 'C';
+    let d = 0, c = 0;
+    if (lastL === 'D') d++; else c++;
+    if (lastR === 'D') d++; else c++;
+    return d >= c ? 'D' : 'C';
+  }
+
+  static payoff(my, opp) {
+    if (my === 'C' && opp === 'C') return 2;
+    if (my === 'C' && opp === 'D') return -1;
+    if (my === 'D' && opp === 'C') return 3;
+    return 0;
+  }
+
+  static lineColor(my, opp) {
+    if (my === 'C' && opp === 'C') return '#00b894';
+    if (my === 'D' && opp === 'D') return '#d63031';
+    return '#e17055';
+  }
+
+  static applyNoise(action) {
+    if (Math.random() < 0.05) return action === 'C' ? 'D' : 'C';
+    return action;
+  }
+}
+
+/* ===== EvolutionEngine ===== */
+class EvolutionEngine {
+  constructor(state, circle) {
+    this.state = state;
+    this.circle = circle;
+    this.running = false;
+  }
+
+  async runRound(opts = {}) {
+      if (this.running || !this.state.isFull()) return;
+      this.running = true;
+      const fast = !!opts.fast;
+      const N = this.state.playerCount;
+    const actions = Array.from({ length: N }, () => ({}));
+    const grudgeCtx = { grudgeMap: new Map(this.state.grudgeMap), playerIndex: 0 };
+
+    for (let i = 0; i < N; i++) {
+      if (!this.state.nodes[i]) continue;
+      grudgeCtx.playerIndex = i;
+      const role = this.state.nodes[i];
+      if (role === 'conformist') {
+        const act = StrategyLogic.conformistAction(i, this.state);
+        actions[i][this.state.left(i)] = act;
+        actions[i][this.state.right(i)] = act;
+        continue;
+      }
+      for (const j of [this.state.left(i), this.state.right(i)]) {
+        if (!this.state.nodes[j]) continue;
+        const hist = this.state.getHistory(i, j);
+        let act = StrategyLogic.decide(role, j, hist, this.state.round, grudgeCtx);
+        if (this.state.noiseEnabled) act = StrategyLogic.applyNoise(act);
+        actions[i][j] = act;
+      }
+    }
+
+    this.state.grudgeMap = grudgeCtx.grudgeMap;
+
+    const scores = Array(N).fill(0);
+    const edges = [];
+    for (let i = 0; i < N; i++) {
+      if (!this.state.nodes[i]) continue;
+      for (const j of [this.state.left(i), this.state.right(i)]) {
+        if (!this.state.nodes[j]) continue;
+        const my = actions[i][j];
+        const opp = actions[j][i];
+        if (my === undefined || opp === undefined) continue;
+        const pts = StrategyLogic.payoff(my, opp);
+        scores[i] += pts;
+        edges.push({ i, j, color: StrategyLogic.lineColor(my, opp) });
+      }
+    }
+
+      if (!fast) {
+        this.circle.drawLines(edges);
+        this.circle.showFloatScores(scores);
+        const audio = AudioManager.get();
+        let heardPos = false;
+        let heardNeg = false;
+        for (let i = 0; i < N; i++) {
+          if (!this.state.nodes[i]) continue;
+          if (scores[i] > 0) heardPos = true;
+          if (scores[i] < 0) heardNeg = true;
+        }
+        if (heardPos) audio.playScorePopup(1);
+        if (heardNeg) audio.playScorePopup(-1);
+        await this.delay(400);
+        this.circle.rotateRing();
+        await this.delay(320);
+      } else {
+        for (let i = 0; i < N; i++) {
+          if (this.state.nodes[i]) this.circle.updateScoreLabel(i, (this.state.cumulativeScores[i] || 0) + scores[i], scores[i]);
+        }
+      }
+
+      for (let i = 0; i < N; i++) {
+        this.state.cumulativeScores[i] += scores[i];
+        if (!fast) this.circle.updateScoreLabel(i, this.state.cumulativeScores[i], scores[i]);
+      }
+
+      const deathCount = Math.max(1, Math.ceil(N / 5));
+      const immortal = new Set(opts.immortalIndices || []);
+      const deathCandidates = [...Array(N).keys()].filter(i => this.state.nodes[i] && !immortal.has(i));
+      const actualDeathCount = deathCandidates.length
+        ? Math.min(deathCount, deathCandidates.length)
+        : 0;
+      const victims = actualDeathCount > 0
+        ? this.pickRandomFromPool(deathCandidates, actualDeathCount)
+        : new Set();
+
+      for (const idx of victims) {
+        if (!fast) {
+          AudioManager.get().playDeath();
+          await this.circle.animateDeath(idx);
+        } else this.circle.clearSlot(idx);
+        this.state.nodes[idx] = null;
+        this.clearIndexHistory(idx);
+      }
+
+      const births = [];
+      for (let i = 0; i < N; i++) {
+        if (this.state.nodes[i] !== null) continue;
+        const donor = this.pickDonor(i, scores, victims);
+        if (donor != null && this.state.nodes[donor]) {
+          this.state.nodes[i] = this.state.nodes[donor];
+          births.push({ index: i, role: this.state.nodes[donor] });
+        }
+      }
+      if (fast) {
+        for (const b of births) this.circle.setSlotStrategy(b.index, b.role, false);
+      } else {
+        for (const b of births) {
+          AudioManager.get().playBirth();
+          await this.circle.animateBirth(b.index, b.role);
+        }
+      }
+
+    this.appendHistories(actions, scores, N);
+    this.state.roundScores.push([...scores]);
+    this.state.round++;
+    this.circle.drawLines([]);
+    this.running = false;
+    return scores;
+  }
+
+  appendHistories(actions, scores, N) {
+    for (let i = 0; i < N; i++) {
+      if (!this.state.nodes[i]) continue;
+      for (const j of [this.state.left(i), this.state.right(i)]) {
+        if (!this.state.nodes[j]) continue;
+        const my = actions[i][j];
+        const opp = actions[j][i];
+        if (my === undefined) continue;
+        const key = GameState.pairKey(i, j);
+        const arr = this.state.getHistory(i, j).slice();
+        arr.push({
+          round: this.state.round,
+          myAction: my,
+          oppAction: opp,
+          myScore: StrategyLogic.payoff(my, opp)
+        });
+        this.state.histories.set(key, arr);
+      }
+    }
+  }
+
+  clearIndexHistory(idx) {
+    for (const key of [...this.state.histories.keys()]) {
+      const [a, b] = key.split('_').map(Number);
+      if (a === idx || b === idx) this.state.histories.delete(key);
+    }
+    for (const key of [...this.state.grudgeMap.keys()]) {
+      const [a, b] = key.split('_').map(Number);
+      if (a === idx || b === idx) this.state.grudgeMap.delete(key);
+    }
+  }
+
+  pickDonor(emptyIdx, scores, victims) {
+    const visited = new Set([emptyIdx]);
+    let frontier = [this.state.left(emptyIdx), this.state.right(emptyIdx)];
+    while (frontier.length) {
+      const alive = frontier.filter(i => !victims.has(i) && this.state.nodes[i]);
+      if (alive.length) {
+        return alive.reduce((best, c) => scores[c] > scores[best] ? c : best, alive[0]);
+      }
+      const next = [];
+      for (const idx of frontier) {
+        for (const nb of [this.state.left(idx), this.state.right(idx)]) {
+          if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
+        }
+      }
+      frontier = next;
+    }
+    const any = [...Array(this.state.playerCount).keys()].filter(i => !victims.has(i) && this.state.nodes[i]);
+    if (!any.length) return null;
+    return any[Math.floor(Math.random() * any.length)];
+  }
+
+  pickRandomFromPool(pool, count) {
+    const arr = pool.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return new Set(arr.slice(0, count));
+  }
+
+  delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+}
+
+/* ===== CircleRenderer ===== */
+class CircleRenderer {
+  constructor(refs, state) {
+    this.refs = refs;
+    this.state = state;
+    this.slotEls = [];
+    this.positions = [];
+    this.radius = 150;
+    this.centerX = 0;
+    this.centerY = 0;
+    this.evolutionRunning = false;
+  }
+
+  calcRadius(N) {
+    let t = Math.max(0, Math.min(1, (N - 5) / 31));
+    let r = 150 + t * 130;
+    if (2 * r * Math.sin(Math.PI / N) < 68) r = 68 / (2 * Math.sin(Math.PI / N));
+    return r;
+  }
+
+  measureArena() {
+    const rect = this.refs.arena.getBoundingClientRect();
+    this.centerX = rect.width / 2;
+    this.centerY = rect.height / 2;
+  }
+
+    buildRing(animate = true, radiusHint = null) {
+      this.clearAll();
+      const N = this.state.playerCount;
+      this.measureArena();
+      this.radius = radiusHint != null ? radiusHint : this.calcRadius(N);
+    this.positions = [];
+    const container = this.refs.circleContainer;
+    for (let i = 0; i < N; i++) {
+      const angle = (2 * Math.PI * i) / N - Math.PI / 2;
+      const x = this.centerX + this.radius * Math.cos(angle);
+      const y = this.centerY + this.radius * Math.sin(angle);
+      this.positions.push({ x, y });
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.dataset.index = String(i);
+      slot.style.left = animate ? `${this.centerX}px` : `${x}px`;
+      slot.style.top = animate ? `${this.centerY}px` : `${y}px`;
+      const wrap = document.createElement('div');
+      wrap.className = 'ball-wrap';
+      slot.appendChild(wrap);
+      const label = document.createElement('span');
+      label.className = 'score-label';
+      slot.appendChild(label);
+      container.appendChild(slot);
+      this.slotEls[i] = slot;
+      if (this.state.nodes[i]) this.setSlotStrategy(i, this.state.nodes[i], false);
+    }
+    if (animate) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        for (let i = 0; i < N; i++) {
+          const s = this.slotEls[i];
+          s.style.left = `${this.positions[i].x}px`;
+          s.style.top = `${this.positions[i].y}px`;
+        }
+      }));
+    }
+    this.updateEvolveButton();
+    this.fitScale();
+  }
+
+  fitScale() {
+    const need = (this.radius + 50) * 2;
+    const rect = this.refs.arena.getBoundingClientRect();
+    const s = Math.min(1, rect.width / need, rect.height / need);
+    this.refs.arenaScaler.style.transform = `scale(${s})`;
+  }
+
+  clearAll() {
+    this.slotEls.forEach(el => el && el.remove());
+    this.slotEls = [];
+    this.positions = [];
+    this.refs.linesSvg.innerHTML = '';
+  }
+
+  setSlotStrategy(index, roleId, animate = true) {
+    const slot = this.slotEls[index];
+    if (!slot) return;
+    const wrap = slot.querySelector('.ball-wrap');
+    wrap.innerHTML = '';
+    wrap.appendChild(RoleVisuals.createBall(roleId, 60));
+    slot.classList.add('filled');
+    slot.dataset.strategy = roleId;
+    if (!animate) wrap.style.transform = 'scale(1)';
+  }
+
+  clearSlot(index) {
+    const slot = this.slotEls[index];
+    if (!slot) return;
+    slot.classList.remove('filled', 'has-score', 'dying', 'birthing', 'replace-die');
+    slot.querySelector('.ball-wrap').innerHTML = '';
+    delete slot.dataset.strategy;
+    this.updateEvolveButton();
+  }
+
+  updateScoreLabel(index, total, roundScore) {
+    const slot = this.slotEls[index];
+    if (!slot) return;
+    const label = slot.querySelector('.score-label');
+    label.textContent = `本轮 ${roundScore >= 0 ? '+' : ''}${roundScore} · 累计 ${total}`;
+    slot.classList.add('has-score');
+  }
+
+  highlightSlot(index, on) {
+    const slot = this.slotEls[index];
+    if (slot) slot.classList.toggle('highlight', on);
+  }
+
+  hitTestSlot(cx, cy) {
+    const rect = this.refs.circleContainer.getBoundingClientRect();
+    const scale = this.getScale();
+    for (let i = 0; i < this.slotEls.length; i++) {
+      const p = this.positions[i];
+      const dx = cx - (rect.left + p.x * scale);
+      const dy = cy - (rect.top + p.y * scale);
+      if (Math.sqrt(dx * dx + dy * dy) <= 30 * scale) return i;
+    }
+    return -1;
+  }
+
+  getScale() {
+    const m = this.refs.arenaScaler.style.transform.match(/scale\(([\d.]+)\)/);
+    return m ? parseFloat(m[1]) : 1;
+  }
+
+  updateEvolveButton() {
+    if (this.refs.screenGame && this.refs.screenGame.classList.contains('classroom-mode')) return;
+    this.refs.btnEvolve.classList.toggle('visible', this.state.isFull() && !this.evolutionRunning);
+  }
+
+  drawLines(edges) {
+    const svg = this.refs.linesSvg;
+    svg.innerHTML = '';
+    const drawn = new Set();
+    for (const e of edges) {
+      const key = e.i < e.j ? `${e.i}-${e.j}` : `${e.j}-${e.i}`;
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const p1 = this.positions[e.i], p2 = this.positions[e.j];
+      if (!p1 || !p2) continue;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+      line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+      line.setAttribute('stroke', e.color);
+      line.setAttribute('stroke-width', '1');
+      line.classList.add('line-fade');
+      svg.appendChild(line);
+    }
+    if (edges.length) setTimeout(() => { svg.innerHTML = ''; }, 850);
+  }
+
+  showFloatScores(scores) {
+    for (let i = 0; i < scores.length; i++) {
+      if (!this.slotEls[i] || !this.state.nodes[i]) continue;
+      const el = document.createElement('span');
+      el.className = 'float-score';
+      const s = scores[i];
+      el.textContent = (s > 0 ? '+' : '') + s;
+      if (s < 0) el.classList.add('neg');
+      if (s === 0) el.classList.add('zero');
+      this.slotEls[i].appendChild(el);
+      setTimeout(() => el.remove(), 820);
+    }
+  }
+
+  rotateRing() {
+    const c = this.refs.circleContainer;
+    c.style.transform = 'rotate(5deg)';
+    setTimeout(() => { c.style.transform = 'rotate(0deg)'; }, 300);
+  }
+
+  animateDeath(index) {
+    return new Promise(resolve => {
+      const slot = this.slotEls[index];
+      if (!slot) { resolve(); return; }
+      slot.classList.add('dying');
+      setTimeout(() => { slot.classList.remove('dying', 'filled', 'has-score'); slot.querySelector('.ball-wrap').innerHTML = ''; delete slot.dataset.strategy; resolve(); }, 550);
+    });
+  }
+
+  animateReplaceDeath(index) {
+    return new Promise(resolve => {
+      const slot = this.slotEls[index];
+      if (!slot) { resolve(); return; }
+      slot.classList.add('replace-die');
+      setTimeout(() => { slot.classList.remove('replace-die'); resolve(); }, 500);
+    });
+  }
+
+  animateBirth(index, roleId) {
+    return new Promise(resolve => {
+      this.setSlotStrategy(index, roleId, false);
+      const slot = this.slotEls[index];
+      slot.classList.add('birthing');
+      setTimeout(() => { slot.classList.remove('birthing'); resolve(); }, 550);
+    });
+  }
+}
+
+/* ===== UnitPanel ===== */
+class UnitPanel {
+  constructor(refs) { this.refs = refs; }
+  render() {
+    const list = this.refs.paletteList;
+    list.innerHTML = '';
+    RoleVisuals.getRoleIds().forEach(id => {
+      const r = RoleVisuals.roles[id];
+      const unit = document.createElement('div');
+      unit.className = 'palette-unit';
+      unit.dataset.strategy = id;
+      const ball = RoleVisuals.createBall(id, 40);
+      unit.appendChild(ball);
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = r.name;
+      unit.appendChild(name);
+      list.appendChild(unit);
+    });
+  }
+  collapse() { this.refs.unitPanel.classList.add('collapsed'); }
+  expand() { this.refs.unitPanel.classList.remove('collapsed'); }
+  showTooltip(roleId, x, y) {
+    const r = RoleVisuals.roles[roleId];
+    const tip = this.refs.tooltip;
+    tip.innerHTML = `<div class="tip-title">${r.name} / ${r.nameEn}</div><div class="tip-persona">${r.persona}</div><div class="tip-logic">${r.logic}</div>`;
+    tip.style.display = 'block';
+    tip.style.left = `${Math.min(x - 140, window.innerWidth - 310)}px`;
+    tip.style.top = `${Math.max(y - 100, 8)}px`;
+  }
+  hideTooltip() { this.refs.tooltip.style.display = 'none'; }
+}
+
+/* ===== DragDropManager ===== */
+class DragDropManager {
+  constructor(refs, state, circle, onPlaced) {
+    this.refs = refs;
+    this.state = state;
+    this.circle = circle;
+    this.onPlaced = onPlaced;
+    this.dragging = false;
+    this.strategyId = null;
+    this.ghost = null;
+    this.highlightIdx = -1;
+  }
+  bind() {
+    this.refs.paletteList.addEventListener('mousedown', e => {
+      if (this.refs.screenGame.classList.contains('classroom-mode')) return;
+      const unit = e.target.closest('.palette-unit');
+      if (!unit) return;
+      e.preventDefault();
+      this.startDrag(unit.dataset.strategy, e.clientX, e.clientY, unit);
+    });
+    document.addEventListener('mousemove', e => this.onMove(e));
+    document.addEventListener('mouseup', e => this.onUp(e));
+  }
+  startDrag(strategyId, x, y, unitEl) {
+    this.dragging = true;
+    this.strategyId = strategyId;
+    this.ghost = document.createElement('div');
+    this.ghost.className = 'drag-ghost';
+    this.ghost.appendChild(RoleVisuals.createBall(strategyId, 40));
+    this.ghost.style.left = `${x}px`;
+    this.ghost.style.top = `${y}px`;
+    document.body.appendChild(this.ghost);
+    const ball = unitEl && unitEl.querySelector('.role-ball');
+    if (ball) { ball.style.opacity = '0.5'; setTimeout(() => { ball.style.opacity = '1'; }, 180); }
+  }
+  onMove(e) {
+    if (!this.dragging || !this.ghost) return;
+    this.ghost.style.left = `${e.clientX}px`;
+    this.ghost.style.top = `${e.clientY}px`;
+    const idx = this.circle.hitTestSlot(e.clientX, e.clientY);
+    if (idx !== this.highlightIdx) {
+      if (this.highlightIdx >= 0) this.circle.highlightSlot(this.highlightIdx, false);
+      this.highlightIdx = idx;
+      if (idx >= 0) this.circle.highlightSlot(idx, true);
+    }
+  }
+  async onUp(e) {
+    if (!this.dragging) return;
+    const idx = this.circle.hitTestSlot(e.clientX, e.clientY);
+    if (idx >= 0 && this.strategyId) {
+      if (this.state.nodes[idx]) await this.circle.animateReplaceDeath(idx);
+      this.state.nodes[idx] = this.strategyId;
+      this.circle.setSlotStrategy(idx, this.strategyId);
+      if (this.onPlaced) this.onPlaced();
+    }
+    if (this.highlightIdx >= 0) this.circle.highlightSlot(this.highlightIdx, false);
+    this.highlightIdx = -1;
+    if (this.ghost) { this.ghost.remove(); this.ghost = null; }
+    this.dragging = false;
+    this.strategyId = null;
+    this.circle.updateEvolveButton();
+  }
+}
+
+/* ===== UIManager ===== */
+class UIManager {
+  constructor(refs) { this.refs = refs; this.allScreens = []; }
+
+  registerScreens(list) { this.allScreens = list; }
+
+  showScreen(id) {
+    this.allScreens.forEach(el => el && el.classList.toggle('active', el.id === id));
+    if (this.refs.btnEsc) {
+      this.refs.btnEsc.classList.toggle('visible', id === 'screen-game' && !this.refs.screenGame.classList.contains('classroom-mode'));
+    }
+    if (id !== 'screen-game') this.closeEsc();
+  }
+
+  toggleEsc() {
+    if (this.refs.escOverlay.classList.contains('open')) this.closeEsc();
+    else this.openEsc();
+  }
+
+  openEsc() {
+    this.refs.escOverlay.classList.add('open');
+    this.refs.saveSlotsPanel.classList.remove('open');
+  }
+
+  closeEsc() {
+    this.refs.escOverlay.classList.remove('open');
+    this.refs.saveSlotsPanel.classList.remove('open');
+  }
+
+  setRoundText(round) {
+    this.refs.roundDisplay.textContent = round === 0 ? '准备阶段' : `第 ${round} 轮`;
+  }
+
+  validateCount(val) {
+    const n = parseInt(val, 10);
+    if (isNaN(n) || n < 1 || n > 36) {
+      this.refs.countInput.classList.add('shake');
+      this.refs.countHint.textContent = '人数需在 1-36 之间';
+      setTimeout(() => this.refs.countInput.classList.remove('shake'), 400);
+      return null;
+    }
+    this.refs.countHint.textContent = '';
+    return n;
+  }
+
+  renderPresetButtons(onPreset) {
+    const presets = [
+      { id:'classic', label:'经典对决' },
+      { id:'trust', label:'信任的诞生' },
+      { id:'invasion', label:'骗子的入侵' },
+      { id:'noise_hell', label:'噪声地狱' },
+      { id:'plague', label:'空间瘟疫' },
+      { id:'prober_feast', label:'试探者盛宴' },
+      { id:'pavlov_swamp', label:'变色龙沼泽' },
+      { id:'chaos_edge', label:'混沌边缘' }
+    ];
+    const box = this.refs.presetBtns;
+    box.innerHTML = '';
+    presets.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary';
+      btn.textContent = p.label;
+      btn.addEventListener('click', () => onPreset(p.id));
+      box.appendChild(btn);
+    });
+  }
+
+  buildPresetLayout(presetId, N) {
+    const shuffle = arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    const fillWeights = (weights, n) => {
+      const arr = [];
+      let assigned = 0;
+      weights.forEach((w, wi) => {
+        const c = wi === weights.length - 1 ? n - assigned : Math.round(n * w.pct / 100);
+        for (let k = 0; k < c; k++) arr.push(w.id);
+        assigned += c;
+      });
+      while (arr.length < n) arr.push(weights[0].id);
+      while (arr.length > n) arr.pop();
+      return shuffle(arr);
+    };
+
+    switch (presetId) {
+      case 'classic':
+        return fillWeights([{id:'copycat',pct:33},{id:'cheater',pct:33},{id:'detective',pct:34}], N);
+      case 'trust':
+        return fillWeights([{id:'copycat',pct:33},{id:'generous_copycat',pct:33},{id:'cooperator',pct:34}], N);
+      case 'invasion':
+        return fillWeights([{id:'cheater',pct:28},{id:'copycat',pct:55},{id:'sucker',pct:17}], N);
+      case 'noise_hell':
+        return Array(N).fill('copycat');
+      case 'plague': {
+        const a = ['cheater'];
+        while (a.length < N) a.push('conformist');
+        return shuffle(a);
+      }
+      case 'prober_feast': {
+        const probers = Math.min(6, N);
+        const rest = N - probers;
+        const a = Array(probers).fill('prober');
+        for (let i = 0; i < rest; i++) a.push(i % 2 === 0 ? 'cooperator' : 'sucker');
+        return shuffle(a);
+      }
+      case 'pavlov_swamp':
+        return Array(N).fill('pavlov');
+      case 'chaos_edge': {
+        if (N <= 6) return fillWeights([{id:'joker',pct:100}], N);
+        const j = Math.max(1, Math.round(N * 6 / 36));
+        const c = Math.max(1, Math.round(N * 20 / 36));
+        const g = Math.max(1, Math.round(N * 10 / 36));
+        let rem = N - j - c - g;
+        const a = [...Array(j).fill('joker'), ...Array(c).fill('copycat'), ...Array(g).fill('grudger')];
+        while (rem-- > 0) a.push('copycat');
+        return shuffle(a);
+      }
+      default:
+        return Array(N).fill('copycat');
+    }
+  }
+}
+
+
+const CLASSROOM_PROGRESS_KEY = 'trustEvolution_classroom_progress';
+
+/* ===== LessonConfig ===== */
+class LessonConfig {
+  static resolvePositions(spec, N, taken) {
+    if (Array.isArray(spec)) return spec;
+    if (spec === 'all') return [...Array(N).keys()];
+    if (spec === 'even') return [...Array(N).keys()].filter(i => i % 2 === 0);
+    if (spec === 'odd') return [...Array(N).keys()].filter(i => i % 2 === 1);
+    if (spec === 'remaining') return [...Array(N).keys()].filter(i => !taken.has(i));
+    if (spec === 'everyThird') return [...Array(N).keys()].filter(i => i % 3 === 0);
+    if (spec === 'everyThirdOffset1') return [...Array(N).keys()].filter(i => i % 3 === 1);
+    if (spec === 'everyThirdOffset2') return [...Array(N).keys()].filter(i => i % 3 === 2);
+    return [];
+  }
+
+  static buildNodes(lesson) {
+    const N = lesson.playerCount;
+    const nodes = Array(N).fill(null);
+    const taken = new Set();
+    for (const block of lesson.preplaced) {
+      let posList = LessonConfig.resolvePositions(block.positions, N, taken);
+      if (Array.isArray(block.positions)) posList = block.positions;
+      const use = posList.slice(0, block.count);
+      use.forEach(p => { if (p >= 0 && p < N) { nodes[p] = block.role; taken.add(p); } });
+    }
+    return nodes;
+  }
+
+  static getLesson(id) { return LessonConfig.lessons.find(l => l.id === id); }
+
+  static getChapters() {
+    return [
+      { title: '序章：小社会的萌芽', ids: [1, 2] },
+      { title: '第一章：善良与脆弱', ids: [3, 4, 5] },
+      { title: '第二章：互惠的演化', ids: [6, 7, 8] },
+      { title: '第三章：高级策略', ids: [9, 10, 11] },
+      { title: '第四章：空间与结构', ids: [12, 13, 14] }
+    ];
+  }
+
+  static lessons = [
+    { id:1, name:'寄生', themeColor:'#FF6B6B', playerCount:4, radiusHint:160, immortalIndices:[3], forcedNoise:false, targetRounds:8, editable:false,
+      storyBg:['一个闭塞的山谷果园，4 户人家围泉而居。3 户「老好人」日出而作，把收成分给左右邻居；1 户「投机者」住在泉眼边（索引 3），从不播种，只等左右两家送粮来时全部私吞。','你是路过的游商，坐在山顶观察这个村子。冲突在于：投机者同时剥削两个方向，每轮净赚，而老好人们每轮净亏。'],
+      cast:[{role:'cooperator',storyName:'老好人',count:3},{role:'cheater',storyName:'投机者',count:1}],
+      preplaced:[{role:'cooperator',count:3,positions:[0,1,2]},{role:'cheater',count:1,positions:[3]}],
+      question:'8 轮后，山谷里哪种家庭最多？',
+      options:[{id:'A',label:'老好人',roleRef:'cooperator',isCorrect:false},{id:'B',label:'投机者',roleRef:'cheater',isCorrect:true},{id:'C',label:'一样多',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：投机者吃光了果园', revealStory:'投机者像水蛭一样吸干了泉眼两侧的血液。老好人 A 在第 3 轮破产，他的房子空出来，被投机者的后代占据——因为投机者得分最高。8 轮后你再看，山谷里只剩投机者的旗帜。',
+      revealTheory:'纯粹的善良如果没有防御机制，就等于在群体中悬挂「欢迎剥削」的招牌。这就是寄生——个体理性导致集体悲剧。' },
+    { id:2, name:'城墙', themeColor:'#74B9FF', playerCount:6, radiusHint:180, immortalIndices:[], forcedNoise:false, targetRounds:10, editable:false,
+      storyBg:['北方边境 6 座烽火台围成一圈。4 座是「复仇者」（复读机），遵守血誓：你帮我点火，我帮你点火；你背叛我，我下一轮必以箭雨回击。2 座是「逃兵」（骗子），收到求援后永远不发兵，只坐收渔利。','你是朝廷派来的监察史，手持令箭站在中央高台。逃兵 1 号夹在复仇者 0 与 2 之间；逃兵 4 号夹在复仇者 3 与 5 之间——两个逃兵试图吃两边空饷。'],
+      cast:[{role:'copycat',storyName:'复仇者',count:4},{role:'cheater',storyName:'逃兵',count:2}],
+      preplaced:[{role:'copycat',count:4,positions:[0,2,3,5]},{role:'cheater',count:2,positions:[1,4]}],
+      question:'10 轮后，边境线上存活的大多数是？',
+      options:[{id:'A',label:'复仇者',roleRef:'copycat',isCorrect:true},{id:'B',label:'逃兵',roleRef:'cheater',isCorrect:false},{id:'C',label:'两败俱伤',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：逃兵被互惠法则淘汰', revealStory:'逃兵 1 号私吞了第一批军饷，但下一轮，左右两座烽火台的箭矢同时对准了他。他每骗一次，就要同时承受两侧的报复。10 轮后，逃兵的烽火台熄灭了——不是被朝廷斩首，而是被边境的互惠法则自然淘汰。',
+      revealTheory:'当互惠策略形成包围圈时，剥削者无处可逃。这不是道德的胜利，而是数学的围剿——背叛的代价太高了。' },
+    { id:3, name:'理想城', themeColor:'#FF6B6B', playerCount:8, radiusHint:200, immortalIndices:[7], forcedNoise:false, targetRounds:12, editable:false,
+      storyBg:['南方平原上 8 座白色尖塔围成「理想城」，塔中住的是「圣人」（合作者），签订契约：永不设防，资源共享。第 7 号塔（泉眼塔）在签约前混进了一个「病毒」（骗子），他微笑着签字，心里计划着白嫖。','你是契约的公证人，手持羊皮卷站在圆环中央。病毒每轮从左右两座圣塔榨取资源，圣人们遵守契约，从不反击。'],
+      cast:[{role:'cooperator',storyName:'圣人',count:7},{role:'cheater',storyName:'病毒',count:1}],
+      preplaced:[{role:'cooperator',count:7,positions:[0,1,2,3,4,5,6]},{role:'cheater',count:1,positions:[7]}],
+      question:'12 轮后，这座城的主流居民是？',
+      options:[{id:'A',label:'圣人',roleRef:'cooperator',isCorrect:false},{id:'B',label:'病毒',roleRef:'cheater',isCorrect:true},{id:'C',label:'奇迹般维持',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：乌托邦只维持了数轮', revealStory:'第 3 轮，病毒从 1 个变成了 3 个——被榨干的圣人塔空出来，被病毒的后代占据。第 7 轮，白色尖塔开始染灰。12 轮后你展开羊皮卷，发现城徽已经变成了病毒的图腾。',
+      revealTheory:'完美的善良是癌细胞的温床。只需一个背叛者，就能摧毁整个合作生态。这就是乌托邦悖论。' },
+    { id:4, name:'防火墙', themeColor:'#00cec9', playerCount:8, radiusHint:200, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      storyBg:['理想城沦陷后，北方建立 8 座要塞：5 座由「警卫」（复读机）驻守，2 座由「平民」（合作者）居住，1 座缺口（索引 3）被「间谍」（骗子）趁夜潜入。间谍的左右要塞（索引 2 和 4）恰好都是警卫。','你是要塞指挥官，站在瞭望塔上。警卫的规则是：你对我开火，我下一轮必还击；你对我友好，我下一轮必回礼。间谍试图骗取补给，但反击机制已经启动——即使他侥幸未被随机死亡抽中，得分也永远低于两侧警卫。'],
+      cast:[{role:'copycat',storyName:'警卫',count:5},{role:'cooperator',storyName:'平民',count:2},{role:'cheater',storyName:'间谍',count:1}],
+      preplaced:[{role:'copycat',count:5,positions:[0,1,2,4,5]},{role:'cooperator',count:2,positions:[6,7]},{role:'cheater',count:1,positions:[3]}],
+      question:'15 轮后，间谍能成功繁殖吗？哪种人最多？',
+      options:[{id:'A',label:'警卫（复读机）',roleRef:'copycat',isCorrect:true},{id:'B',label:'间谍',roleRef:'cheater',isCorrect:false},{id:'C',label:'平民',roleRef:'cooperator',isCorrect:false}],
+      revealTitle:'结局：背叛的成本高于收益', revealStory:'间谍第 1 轮骗到了补给，但第 2 轮，左右两座要塞同时切断了他的粮道。他每骗一次，就要付出双倍的封锁代价。即使他活着，得分也永远挤不进前 50%。15 轮后，要塞的缺口被高分的警卫自然填补——互惠策略不需要主动出击，只需要让背叛的成本高于收益。',
+      revealTheory:'互惠策略形成防火墙，不是消灭威胁，而是让威胁的繁殖成本太高。合作者需要「带牙齿的同伴」才能生存。' },
+    { id:5, name:'冤大头', themeColor:'#96CEB4', playerCount:8, radiusHint:200, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      storyBg:['东海渔港，8 艘渔船围港停泊。4 艘船老大是「冤大头」（傻子），永远先交货后收钱；4 艘是「强盗」（骗子），永远收货后赖账。渔港没有衙门，交易全凭口头约定。','你是港口的记账先生，每天黄昏统计盈亏。冤大头的船每轮都被骗走鱼获，得分 -1；强盗每轮白嫖，得分 +3——但冤大头永远不会改变策略。'],
+      cast:[{role:'sucker',storyName:'冤大头',count:4},{role:'cheater',storyName:'强盗',count:4}],
+      preplaced:[{role:'sucker',count:4,positions:'even'},{role:'cheater',count:4,positions:'odd'}],
+      question:'15 轮后，港口里谁占主导？',
+      options:[{id:'A',label:'冤大头',roleRef:'sucker',isCorrect:false},{id:'B',label:'强盗',roleRef:'cheater',isCorrect:true},{id:'C',label:'互相制衡',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：港口挂满了黑旗', revealStory:'第 3 轮，冤大头 A 的船空了，他付不起船员的工钱，船被拍卖。得分最高的强盗买下了他的船——于是港口里又多了一艘强盗船。15 轮后，你翻开账本，发现 8 艘船挂的都是黑旗。',
+      revealTheory:'无条件的信任不是美德，而是对骗子的邀请函。没有识别能力的善良，在演化中注定灭绝。' },
+    { id:6, name:'以牙还牙', themeColor:'#FFEAA7', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      storyBg:['西域商道，10 个驼队围成休息圈。5 个是「镜子人」（复读机），5 个是「沙匪」（骗子）。商道上没有王法，只有规矩：你敬我一尺，我敬你一丈；你捅我一刀，我必还你一箭。','你是客栈掌柜，在篝火旁冷眼旁观。沙匪每次抢劫得手，下一轮必遭镜子人的联合报复；镜子人虽然偶尔吃亏，但长期得分更稳。'],
+      cast:[{role:'copycat',storyName:'镜子人',count:5},{role:'cheater',storyName:'沙匪',count:5}],
+      preplaced:[{role:'copycat',count:5,positions:'even'},{role:'cheater',count:5,positions:'odd'}],
+      question:'15 轮后，商道上哪方会赢？',
+      options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'沙匪',roleRef:'cheater',isCorrect:false},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：驼铃响彻戈壁', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮他的驼被射成了刺猬。他每骗一次，就要花 3 轮疗伤。15 轮后，商道上的沙匪缩在角落，而镜子人的驼铃声响彻戈壁。',
+      revealTheory:'当背叛会招致报复时，背叛就不再划算。报复能力不是暴力，而是让「合作」成为理性选择的信用背书。' },
+    { id:7, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:true, targetRounds:15, editable:false,
+      storyBg:['10 个镜子人围坐在「诚信酒馆」，发誓以牙还牙。但地板年久失修，每轮有 5% 的概率有人滑倒，手里的酒杯「意外」泼到邻居脸上——看起来像背叛，实则是失误。没有道歉机制，镜子人只看行动。','你是酒馆角落里弹琵琶的盲眼乐师，听见了每一次「背叛」背后的惊呼。一次滑倒引发的「背叛」，会触发报复，进而引发报复的报复……'],
+      cast:[{role:'copycat',storyName:'镜子人',count:10}],
+      preplaced:[{role:'copycat',count:10,positions:'all'}],
+      question:'15 轮后，这群人还能合作吗？主流状态是？',
+      options:[{id:'A',label:'继续合作',roleRef:null,isCorrect:false},{id:'B',label:'互相背叛/仇恨螺旋',roleRef:'copycat',isCorrect:true},{id:'C',label:'一半一半',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：诚信酒馆变成仇杀酒馆', revealStory:'第 3 轮，靠门的镜子人滑倒了。第 4 轮，他的邻居报复了他。第 5 轮，邻居的邻居也拔出了刀……你听见琵琶弦一根根崩断，就像信任在碎裂。15 轮后，诚信酒馆变成了仇杀酒馆。',
+      revealTheory:'没有宽容的互惠，一次噪声就能引发永恒的仇恨螺旋。噪声是合作最隐蔽的杀手。' },
+    { id:8, name:'灭火器', themeColor:'#FDCB6E', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:true, targetRounds:15, editable:false,
+      storyBg:['诚信酒馆隔壁开了「宽宏客栈」，7 个镜子人搬来，与 3 个「宽宏者」（大善人）混住。宽宏者 90% 以牙还牙，10% 选择原谅——「算了，他可能只是滑倒了」。地板同样年久失修，5% 误触仍在发生。','你是两家酒馆的房东，手持钥匙站在中间。当仇恨链即将形成时，宽宏者的「算了」像剪刀一样剪断链条。'],
+      cast:[{role:'copycat',storyName:'镜子人',count:7},{role:'generous_copycat',storyName:'宽宏者',count:3}],
+      preplaced:[{role:'copycat',count:7,positions:[0,1,2,3,4,5,6]},{role:'generous_copycat',count:3,positions:[7,8,9]}],
+      question:'开启噪声后 15 轮，谁能阻止仇恨螺旋？',
+      options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:false},{id:'B',label:'宽宏者',roleRef:'generous_copycat',isCorrect:true},{id:'C',label:'谁也阻止不了',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：宽宏客栈灯火通明', revealStory:'第 6 轮，仇恨链再次启动，但宽宏者 9 号突然放下了刀：「算了，他上次帮过我七次。」镜子人 2 号愣在原地，刀悬在半空。15 轮后，宽宏客栈的灯火通明，而诚信酒馆早已人去楼空。',
+      revealTheory:'偶尔原谅不是软弱，而是打破死循环的灭火器。宽容是复杂系统中不可或缺的稳定阀。' },
+    { id:9, name:'侦探事务所', themeColor:'#FF7675', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      storyBg:['维多利亚风格的 12 人圆桌侦探俱乐部。4 个「侦探」戴猎鹿帽，4 个「老实人」（合作者）捧茶杯，4 个「惯犯」（骗子）藏在阴影里。侦探前 4 轮是试用期：合作-背叛-合作-合作；4 轮后，若曾被背叛则变镜子人，若从未被背叛则变骗子。','你是俱乐部主席，手持怀表计时。侦探们像变色龙一样分化——面对老实人他们变黑，面对惯犯他们变白。'],
+      cast:[{role:'detective',storyName:'侦探',count:4},{role:'cooperator',storyName:'老实人',count:4},{role:'cheater',storyName:'惯犯',count:4}],
+      preplaced:[{role:'detective',count:4,positions:[0,3,6,9]},{role:'cooperator',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
+      question:'20 轮后，谁最成功？',
+      options:[{id:'A',label:'侦探',roleRef:'detective',isCorrect:true},{id:'B',label:'老实人',roleRef:'cooperator',isCorrect:false},{id:'C',label:'惯犯',roleRef:'cheater',isCorrect:false}],
+      revealTitle:'结局：侦探占据七个座位', revealStory:'4 轮试用期结束，面对老实人的侦探摘下了猎鹿帽，露出了骗子的獠牙；面对惯犯的侦探则系紧了领带，变成了最冷酷的复仇者。20 轮后，你清点人数：侦探们占据了 7 个座位——他们从未坚守原则，却永远站在赢家那边。',
+      revealTheory:'信息就是生存力。先试探再决策，比盲目信任或盲目背叛走得更远。适应性策略在混合环境中具有演化优势。' },
+    { id:10, name:'变色龙', themeColor:'#A29BFE', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      storyBg:['热带雨林，12 只动物围水潭而居。4 只「变色龙」（墙头草）只看输赢调整肤色；4 只「镜子鸟」（复读机）以牙还牙；4 只「毒蛇」（骗子）永远偷袭。雨季食物匮乏，每轮必须选择与左邻或右邻共享或抢夺领地。','你是蹲在树上的博物学家，手持望远镜。镜子鸟与毒蛇陷入死斗，变色龙却根据上一轮的得分随时切换阵营。'],
+      cast:[{role:'pavlov',storyName:'变色龙',count:4},{role:'copycat',storyName:'镜子鸟',count:4},{role:'cheater',storyName:'毒蛇',count:4}],
+      preplaced:[{role:'pavlov',count:4,positions:[0,3,6,9]},{role:'copycat',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
+      question:'20 轮后，谁能适应三方混战？',
+      options:[{id:'A',label:'变色龙',roleRef:'pavlov',isCorrect:true},{id:'B',label:'镜子鸟',roleRef:'copycat',isCorrect:false},{id:'C',label:'毒蛇',roleRef:'cheater',isCorrect:false}],
+      revealTitle:'结局：水潭边只剩变色龙', revealStory:'镜子鸟被毒蛇咬死后，变色龙立刻变成毒蛇的颜色；当毒蛇互相残杀时，变色龙又变成合作者的颜色。20 轮后，你放下望远镜——水潭边只剩变色龙，它们身上同时倒映着三种颜色。',
+      revealTheory:'不坚守原则，只坚守利益——在动荡环境中，「赢存输变」的自适应性，比道德或强硬更重要。' },
+    { id:11, name:'猎手与猎物', themeColor:'#636E72', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      storyBg:['北方雪原，12 个帐篷围成猎营。3 个「猎手」（试探者）骑着黑狼，其余 9 个是「肥羊」（傻子），只会低头吃草。猎手第 1 轮必定偷袭试探；若肥羊不反击，则判定为猎物，永久压榨；若反击，则切换为镜子模式。','你是营火旁的萨满，能听懂狼语。猎手们像手术刀一样精准识别软柿子，对硬茬子则立刻装成盟友。'],
+      cast:[{role:'prober',storyName:'猎手',count:3},{role:'sucker',storyName:'肥羊',count:9}],
+      preplaced:[{role:'prober',count:3,positions:[0,4,8]},{role:'sucker',count:9,positions:'remaining'}],
+      question:'15 轮后，猎手会？',
+      options:[{id:'A',label:'被肥羊的善良感化',roleRef:null,isCorrect:false},{id:'B',label:'识别软柿子并统治群体',roleRef:'prober',isCorrect:true},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：猎手建立剥削王朝', revealStory:'猎手 0 号第 1 轮咬了肥羊 1 号，肥羊 1 号只是咩咩叫了两声。猎手 0 号的狼眼亮了：「猎物确认。」15 轮后，3 个猎手各自建立了剥削王朝，肥羊们的帐篷里只剩下啃光的骨头。',
+      revealTheory:'策略性剥削：先刺探，再决定是否永久压榨。不反击的善良，就是猎物。识别对手的反击能力，是生存的第一课。' },
+    { id:12, name:'瘟疫', themeColor:'#00B894', playerCount:24, radiusHint:280, immortalIndices:[0], forcedNoise:false, targetRounds:10, editable:false,
+      storyBg:['南方盲从部落，24 个帐篷围成圣圈。23 个「盲从者」（跟风狗）没有主见，只看左右邻居上一轮做什么，自己就跟着做。1 个「零号病人」（骗子）在祭坛边打了个喷嚏——他第 1 轮就选择了背叛。盲从者们以为零号病人在执行某种新仪式。','你是部落外的游医，被挡在圣圈外观察。零号病人背叛后，左右两个盲从者下一轮也背叛；这两个盲从者又影响各自的另一个邻居……'],
+      cast:[{role:'cheater',storyName:'零号病人',count:1},{role:'conformist',storyName:'盲从者',count:23}],
+      preplaced:[{role:'cheater',count:1,positions:[0]},{role:'conformist',count:23,positions:'remaining'}],
+      question:'10 轮后，这个部落的主流行为是？',
+      options:[{id:'A',label:'合作互助',roleRef:null,isCorrect:false},{id:'B',label:'互相欺骗/背叛',roleRef:'conformist',isCorrect:true},{id:'C',label:'保持混乱',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：背叛之火燃遍圣圈', revealStory:'第 1 轮，零号病人背叛了。第 2 轮，他的两个邻居跟着背叛。第 3 轮，4 个帐篷挂起了黑旗……你看着背叛像瘟疫一样沿着圣圈蔓延，10 轮后，24 个帐篷全部燃起了背叛之火。零号病人站在祭坛上大笑——他从未被治愈，因为他就是瘟疫本身。',
+      revealTheory:'没有主见的人，是病毒最好的宿主。空间结构会放大微小扰动——一个骗子就能通过盲从者毁灭整个群体。' },
+    { id:13, name:'调解员', themeColor:'#E17055', playerCount:24, radiusHint:280, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      storyBg:['西部荒野，24 个矿坑围成决斗场。8 个「死仇者」（记仇者）与 8 个「强盗」（骗子）世代血仇，中间夹着 8 个「调解员」（和事佬）。死仇者被骗一次就终身追杀；调解员被骗后只报复一轮，然后原谅。','你是酒馆老板娘，给三方卖酒，冷眼旁观。死仇者与强盗陷入无限死循环，调解员试图在中间「只打一拳就握手」。'],
+      cast:[{role:'grudger',storyName:'死仇者',count:8},{role:'cheater',storyName:'强盗',count:8},{role:'firm_but_fair',storyName:'调解员',count:8}],
+      preplaced:[{role:'grudger',count:8,positions:'everyThird'},{role:'cheater',count:8,positions:'everyThirdOffset1'},{role:'firm_but_fair',count:8,positions:'everyThirdOffset2'}],
+      question:'15 轮后，调解员能阻止血仇吗？',
+      options:[{id:'A',label:'能，仇恨被平息',roleRef:'firm_but_fair',isCorrect:true},{id:'B',label:'不能，调解员被双方消灭',roleRef:null,isCorrect:false},{id:'C',label:'三方继续混战',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：调解员的酒馆座无虚席', revealStory:'死仇者 3 号与强盗 4 号互相射了 7 轮，弹药用尽，双双饿死。调解员 5 号曾经被强盗骗过，但他只回了一枪，然后递上了一杯威士忌。15 轮后，调解员的酒馆座无虚席，而死仇者与强盗的坟头已经长满了野草。',
+      revealTheory:'有限报复 vs 无限报复。只报复一轮就原谅，是修复破碎关系的唯一方式。调解不是软弱，而是切断仇恨螺旋的手术刀。' },
+    { id:14, name:'终局', themeColor:'#dfe6e9', playerCount:36, radiusHint:280, immortalIndices:[], forcedNoise:false, targetRounds:20, anyAnswerCorrect:true, editable:false,
+      storyBg:['帝国议会，36 个席位围成圆桌。12 个「镜子议员」（复读机）、12 个「阴谋家」（骗子）、12 个「侦探大臣」三方割据。没有皇帝，只有永恒的博弈。','你是史官，手持毛笔记录这一切。三方在前线僵持，没有任何一方能彻底消灭另一方。'],
+      cast:[{role:'copycat',storyName:'镜子议员',count:12},{role:'cheater',storyName:'阴谋家',count:12},{role:'detective',storyName:'侦探大臣',count:12}],
+      preplaced:[{role:'copycat',count:12,positions:'everyThird'},{role:'cheater',count:12,positions:'everyThirdOffset1'},{role:'detective',count:12,positions:'everyThirdOffset2'}],
+      question:'20 轮后，谁会统治这个社会？（本关无标准答案）',
+      options:[{id:'A',label:'互惠派（复读机）',roleRef:'copycat',isCorrect:true},{id:'B',label:'背叛派（骗子）',roleRef:'cheater',isCorrect:true},{id:'C',label:'信息派（侦探）',roleRef:'detective',isCorrect:true}],
+      revealTitle:'结局：帝国没有胜利者', revealStory:'20 轮后，你放下毛笔，发现三方席位数量几乎没变。镜子议员守住了防线，阴谋家偶尔突破，侦探大臣根据风向切换阵营。帝国没有胜利者，只有永恒的角力。',
+      revealTheory:'真实世界没有终极胜利者。合作、背叛与信息，三种力量永远角力。理解它们的平衡，就是理解了社会的本质。' }
+  ];
+}
+
+class ClassroomProgress {
+  static load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(CLASSROOM_PROGRESS_KEY));
+      const data = d || { unlocked: 1, lessons: {} };
+      if (data.unlocked > 14) data.unlocked = 14;
+      return data;
+    } catch { return { unlocked: 1, lessons: {} }; }
+  }
+  static save(data) { localStorage.setItem(CLASSROOM_PROGRESS_KEY, JSON.stringify(data)); }
+  static isUnlocked(id) { return id <= ClassroomProgress.load().unlocked; }
+  static markComplete(id, wrong) {
+    const d = ClassroomProgress.load();
+    d.lessons[id] = { done: true, wrong: !!wrong };
+    if (id >= d.unlocked && id < 14) d.unlocked = id + 1;
+    ClassroomProgress.save(d);
+  }
+  static getLessonState(id) { return ClassroomProgress.load().lessons[id] || null; }
+}
+
+/* ===== AudioManager ===== */
+class AudioManager {
+  static TIMER_CIRC = 2 * Math.PI * 28;
+
+  static get() {
+    if (!window.trustAudio) window.trustAudio = new AudioManager();
+    return window.trustAudio;
+  }
+
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.bgmOscillators = [];
+    this.isMuted = localStorage.getItem('audioMuted') === 'true';
+    this._baseMaster = 0.3;
+  }
+
+  ensureContext() {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return;
+    }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    this.ctx = new Ctx();
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.connect(this.ctx.destination);
+    this.applyMasterGain();
+  }
+
+  applyMasterGain() {
+    if (!this.masterGain) return;
+    this.masterGain.gain.value = this.isMuted ? 0 : this._baseMaster;
+  }
+
+  playTone(freq, type, duration, delay = 0, vol = 0.3, fadeOut = true) {
+    if (this.isMuted || !this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(vol, t0);
+    if (fadeOut) gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  playEvolveClick() { this.playTone(440, 'sine', 0.15); }
+  playDeath() { this.playTone(150, 'sawtooth', 0.4, 0, 0.35); }
+  playBirth() {
+    this.playTone(660, 'sine', 0.3, 0, 0.25);
+    this.playTone(880, 'sine', 0.3, 0.1, 0.2);
+  }
+  playScorePopup(score) {
+    if (score > 0) this.playTone(523, 'triangle', 0.1, 0, 0.2);
+    else if (score < 0) this.playTone(300, 'square', 0.15, 0, 0.22);
+  }
+  playPredictCorrect() {
+    this.playTone(523, 'sine', 0.1, 0, 0.25);
+    this.playTone(659, 'sine', 0.1, 0.1, 0.25);
+    this.playTone(784, 'sine', 0.2, 0.2, 0.28);
+  }
+  playPredictWrong() {
+    this.playTone(400, 'sawtooth', 0.2, 0, 0.25);
+    this.playTone(350, 'sawtooth', 0.3, 0.15, 0.22);
+  }
+  playTimerTick() { this.playTone(800, 'square', 0.05, 0, 0.18); }
+  playReveal() {
+    this.playTone(220, 'sine', 0.5, 0, 0.35);
+    if (!this.isMuted && this.masterGain) {
+      const g = this.masterGain.gain;
+      const t = this.ctx.currentTime;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(this.isMuted ? 0 : this._baseMaster, t);
+      g.linearRampToValueAtTime(this.isMuted ? 0 : 0.42, t + 0.35);
+      g.linearRampToValueAtTime(this.isMuted ? 0 : this._baseMaster, t + 1.2);
+    }
+  }
+
+  startBGM() {
+    if (this.isMuted || !this.ctx || this.bgmOscillators.length) return;
+    [110, 164.81].forEach(f => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.value = 0.05;
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start();
+      this.bgmOscillators.push({ osc, gain });
+    });
+  }
+
+  stopBGM() {
+    this.bgmOscillators.forEach(({ osc }) => { try { osc.stop(); } catch (_) {} });
+    this.bgmOscillators = [];
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    localStorage.setItem('audioMuted', this.isMuted ? 'true' : 'false');
+    this.applyMasterGain();
+    if (this.isMuted) this.stopBGM();
+    return this.isMuted;
+  }
+
+  updateToggleButtons() {
+    const icon = this.isMuted ? '🔇' : '🔊';
+    document.querySelectorAll('.btn-audio-toggle').forEach(btn => { btn.textContent = icon; });
+  }
+}
+
+/* ===== GameRules ===== */
+class GameRules {
+  static getHtml() {
+    return `
+      <p>在圆环上，每个角色与<strong>左、右两名邻居</strong>各进行一局囚徒困境。点击「演变」后，所有人<strong>同时</strong>出招，再统一结算。</p>
+      <h3>得分矩阵（每局博弈）</h3>
+      <table class="rules-table">
+        <tr><th>你的选择</th><th>邻居选择</th><th>你的得分</th></tr>
+        <tr><td>合作 C</td><td>合作 C</td><td><strong>+2</strong></td></tr>
+        <tr><td>合作 C</td><td>背叛 D</td><td><strong>-1</strong></td></tr>
+        <tr><td>背叛 D</td><td>合作 C</td><td><strong>+3</strong></td></tr>
+        <tr><td>背叛 D</td><td>背叛 D</td><td><strong>0</strong></td></tr>
+      </table>
+      <p>每人每轮与两名邻居各玩一局，<strong>本轮得分 = 两局得分之和</strong>（可正可负）。</p>
+      <h3>每一轮「演变」会发生什么</h3>
+      <ul>
+        <li><strong>博弈</strong>：按各角色策略与历史，决定对每名邻居出「合作」或「背叛」；部分关卡开启 5%「误触」，可能随机反转你的选择。</li>
+        <li><strong>计分</strong>：结算得分，圆环上出现连线颜色（双合作绿、双背叛红、一方吃亏橙）与飘字得分。</li>
+        <li><strong>死亡</strong>：约 <strong>1/5</strong> 的节点随机淘汰（至少 1 人），变为空位。</li>
+        <li><strong>出生</strong>：空位由左右邻居中<strong>本轮得分更高</strong>者的策略复制填充；邻居也死了则向更远寻找。</li>
+      </ul>
+      <p>多轮之后，某种策略会在圆环上越来越多——这就是<strong>演化</strong>。经典课堂中的故事模拟，均遵循以上规则。</p>
+    `;
+  }
+  static mount(intoEl) {
+    if (intoEl) intoEl.innerHTML = GameRules.getHtml();
+  }
+  static openModal() {
+    GameRules.mount(document.getElementById('rules-modal-body'));
+    document.getElementById('rules-overlay').classList.add('open');
+  }
+  static closeModal() {
+    document.getElementById('rules-overlay').classList.remove('open');
+  }
+}
+
+class MainMenu {
+  constructor(refs, app) {
+    this.refs = refs;
+    this.app = app;
+  }
+  render() {
+    const box = document.getElementById('main-menu-entries');
+    box.innerHTML = '';
+    const items = [
+      { id: 'classroom', label: '经典课堂', locked: false, recommended: true, hint: '推荐首次游玩 · 含规则讲解' },
+      { id: 'sandbox', label: '感染演变', locked: false },
+      { id: 'tragedy', label: '公地悲剧（即将开放）', locked: true }
+    ];
+    items.forEach(it => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      let cls = 'menu-entry';
+      if (it.locked) cls += ' locked';
+      if (it.recommended) cls += ' recommended';
+      btn.className = cls;
+      if (it.recommended) {
+        btn.innerHTML = `<span class="menu-star">★</span>${it.label}<span class="menu-hint">${it.hint}</span>`;
+      } else {
+        btn.textContent = it.label;
+      }
+      if (!it.locked) {
+        btn.addEventListener('click', () => {
+          AudioManager.get().ensureContext();
+          if (it.id === 'sandbox') this.app.startSandbox();
+          if (it.id === 'classroom') this.app.openClassroomMap();
+        });
+      }
+      box.appendChild(btn);
+    });
+  }
+}
+
+class ClassroomMap {
+  constructor(refs, app) {
+    this.refs = refs;
+    this.app = app;
+  }
+  render() {
+    const root = document.getElementById('classroom-map-chapters');
+    root.innerHTML = '';
+    LessonConfig.getChapters().forEach(ch => {
+      const sec = document.createElement('div');
+      sec.className = 'map-chapter';
+      const h = document.createElement('h3');
+      h.textContent = ch.title;
+      sec.appendChild(h);
+      const row = document.createElement('div');
+      row.className = 'map-nodes';
+      ch.ids.forEach(id => {
+        const lesson = LessonConfig.getLesson(id);
+        const st = ClassroomProgress.getLessonState(id);
+        const unlocked = ClassroomProgress.isUnlocked(id);
+        const node = document.createElement('button');
+        node.type = 'button';
+        node.className = 'map-node';
+        node.style.setProperty('--node-color', lesson.themeColor);
+        if (!unlocked) { node.classList.add('locked'); node.innerHTML = `<span class="node-icon">🔒</span>第${id}课`; }
+        else {
+          node.classList.add('unlocked');
+          if (st && st.done) {
+            node.classList.add('done');
+            if (st.wrong) node.classList.add('wrong');
+            node.innerHTML = `<span class="node-icon">${st.wrong ? '?' : '✓'}</span>第${id}课<br>${lesson.name}`;
+          } else {
+            node.innerHTML = `<span class="node-icon">○</span>第${id}课<br>${lesson.name}`;
+          }
+          node.addEventListener('click', () => {
+            AudioManager.get().ensureContext();
+            this.app.startLessonStory(id);
+          });
+        }
+        row.appendChild(node);
+      });
+      sec.appendChild(row);
+      root.appendChild(sec);
+    });
+  }
+}
+
+class StorySequence {
+  static TIMER_TOTAL = 50;
+  static TIMER_CIRC = 175.9;
+
+  constructor(refs, app) {
+    this.refs = refs;
+    this.app = app;
+    this.lesson = null;
+    this.selectedBet = -1;
+    this.timerInterval = null;
+    this.timeLeft = StorySequence.TIMER_TOTAL;
+    this._lastTickSecond = -1;
+  }
+
+  start(lesson) {
+    AudioManager.get().stopBGM();
+    this.lesson = lesson;
+    this.selectedBet = -1;
+    this.clearTimer();
+    document.getElementById('btn-story-start').style.display = 'none';
+    this.app.ui.showScreen('screen-story');
+    document.documentElement.style.setProperty('--bet-color', lesson.themeColor);
+    if (lesson.id === 1) {
+      GameRules.mount(document.getElementById('story-rules-body'));
+      this.showAct('story-rules');
+    } else if (lesson.id === 2) {
+      this.showAct('story-lesson2-bridge');
+    } else {
+      this.goStoryBg();
+    }
+  }
+  goStoryBg() {
+    const lesson = this.lesson;
+    this.showAct('story-bg');
+    document.getElementById('story-bg-title').textContent = lesson.name;
+    document.getElementById('story-bg-title').style.color = lesson.themeColor;
+    document.getElementById('story-bg-body').innerHTML = lesson.storyBg.map(p => `<p>${p}</p>`).join('');
+  }
+  showAct(id) {
+    document.querySelectorAll('.story-act').forEach(el => el.classList.toggle('active', el.id === id));
+  }
+  showCast() {
+    this.showAct('story-cast');
+    const row = document.getElementById('story-cast-row');
+    row.innerHTML = '';
+    this.lesson.cast.forEach(c => {
+      const r = RoleVisuals.roles[c.role];
+      const item = document.createElement('div');
+      item.className = 'cast-item';
+      item.appendChild(RoleVisuals.createBall(c.role, 40));
+      const nm = document.createElement('div');
+      nm.className = 'cast-name';
+      nm.textContent = c.count > 1 ? `${c.storyName} × ${c.count}` : c.storyName;
+      const sub = document.createElement('div');
+      sub.className = 'cast-role';
+      sub.textContent = `策略：${r.name}（${r.nameEn}）`;
+      const beh = document.createElement('p');
+      beh.className = 'cast-behavior';
+      beh.textContent = r.logic;
+      item.appendChild(nm);
+      item.appendChild(sub);
+      item.appendChild(beh);
+      row.appendChild(item);
+    });
+  }
+  clearTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+    this._lastTickSecond = -1;
+  }
+
+  renderTimer() {
+    const wrap = document.getElementById('prediction-timer');
+    if (!wrap) return;
+    wrap.classList.toggle('warn', this.timeLeft <= 10);
+    const text = wrap.querySelector('.timer-text');
+    const prog = wrap.querySelector('.timer-progress');
+    if (text) text.textContent = String(Math.max(0, this.timeLeft));
+    if (prog) {
+      const elapsed = StorySequence.TIMER_TOTAL - this.timeLeft;
+      const off = (elapsed / StorySequence.TIMER_TOTAL) * StorySequence.TIMER_CIRC;
+      prog.setAttribute('stroke-dashoffset', String(off));
+    }
+  }
+
+  updateTimerUI() {
+    this.renderTimer();
+    if (this.timeLeft <= 5 && this.timeLeft > 0 && this.timeLeft !== this._lastTickSecond) {
+      this._lastTickSecond = this.timeLeft;
+      AudioManager.get().playTimerTick();
+    }
+  }
+
+  onPlayerSelect(idx) {
+    this.clearTimer();
+    const opts = document.getElementById('story-bet-options');
+    opts.querySelectorAll('.bet-card').forEach((c, i) => {
+      c.classList.toggle('selected', i === idx);
+      c.classList.remove('auto-picked');
+    });
+    this.selectedBet = idx;
+    document.getElementById('btn-story-start').style.display = 'block';
+  }
+
+  autoSelectLastOption() {
+    const last = this.lesson.options.length - 1;
+    const opts = document.getElementById('story-bet-options');
+    const cards = opts.querySelectorAll('.bet-card');
+    cards.forEach(c => c.classList.remove('selected', 'auto-picked'));
+    if (cards[last]) {
+      cards[last].classList.add('selected', 'auto-picked');
+      this.selectedBet = last;
+    }
+    document.getElementById('btn-story-start').style.display = 'block';
+    setTimeout(() => this.startGameFromBet(), 500);
+  }
+
+  startGameFromBet() {
+    if (this.selectedBet < 0) return;
+    this.clearTimer();
+    AudioManager.get().ensureContext();
+    this.app.classroomGame.start(this.lesson, this.selectedBet);
+  }
+
+  showBet() {
+    this.clearTimer();
+    this.showAct('story-bet');
+    this.timeLeft = StorySequence.TIMER_TOTAL;
+    this.renderTimer();
+    document.getElementById('story-bet-question').innerHTML =
+      `经过 <strong>${this.lesson.targetRounds}</strong> 轮演变后，你认为……？<br><span style="font-size:0.95rem;color:#ccc">${this.lesson.question}</span>`;
+    const opts = document.getElementById('story-bet-options');
+    opts.innerHTML = '';
+    document.getElementById('btn-story-start').style.display = 'none';
+    this.lesson.options.forEach((opt, idx) => {
+      const card = document.createElement('div');
+      card.className = 'bet-card';
+      card.innerHTML = `<div style="font-weight:bold;color:${this.lesson.themeColor}">${opt.id}</div>`;
+      if (opt.roleRef) {
+        const mini = RoleVisuals.createBall(opt.roleRef, 40);
+        mini.style.margin = '0.5rem auto';
+        card.insertBefore(mini, card.firstChild.nextSibling);
+      }
+      const lb = document.createElement('div');
+      lb.className = 'bet-label';
+      lb.textContent = opt.label;
+      card.appendChild(lb);
+      card.addEventListener('click', () => this.onPlayerSelect(idx));
+      opts.appendChild(card);
+    });
+    this.timerInterval = setInterval(() => {
+      this.timeLeft--;
+      this.updateTimerUI();
+      if (this.timeLeft <= 0) {
+        this.clearTimer();
+        this.autoSelectLastOption();
+      }
+    }, 1000);
+  }
+  bindOnce() {
+    if (this._bound) return;
+    this._bound = true;
+    document.getElementById('btn-rules-ok').addEventListener('click', () => this.showAct('story-prelude'));
+    document.getElementById('btn-prelude-next').addEventListener('click', () => this.goStoryBg());
+    document.getElementById('btn-lesson2-next').addEventListener('click', () => this.goStoryBg());
+    document.getElementById('btn-story-cast').addEventListener('click', () => this.showCast());
+    document.getElementById('btn-story-bet').addEventListener('click', () => this.showBet());
+    document.getElementById('btn-story-start').addEventListener('click', () => this.startGameFromBet());
+  }
+}
+
+class RevealModal {
+  constructor(refs, app) {
+    this.refs = refs;
+    this.app = app;
+  }
+  show(lesson, option, isCorrect) {
+    const audio = AudioManager.get();
+    audio.ensureContext();
+    audio.playReveal();
+    audio.startBGM();
+    if (lesson.anyAnswerCorrect) audio.playPredictCorrect();
+    else if (isCorrect) audio.playPredictCorrect();
+    else audio.playPredictWrong();
+    const ov = document.getElementById('reveal-overlay');
+    document.getElementById('reveal-title').textContent = lesson.revealTitle;
+    document.getElementById('reveal-title').style.color = lesson.themeColor;
+    document.getElementById('reveal-story').textContent = lesson.revealStory;
+    document.getElementById('reveal-theory').textContent = lesson.revealTheory;
+    const fb = document.getElementById('reveal-feedback');
+    if (lesson.anyAnswerCorrect) {
+      fb.className = 'reveal-feedback correct';
+      fb.textContent = '✓ 你的视角很有价值！';
+    } else if (isCorrect) {
+      fb.className = 'reveal-feedback correct';
+      fb.textContent = '✓ 你的预测完全正确！';
+    } else {
+      fb.className = 'reveal-feedback wrong';
+      fb.textContent = '✗ 大多数人第一次都会猜错——这正是博弈论反直觉的地方。';
+    }
+    ClassroomProgress.markComplete(lesson.id, !isCorrect && !lesson.anyAnswerCorrect);
+    const nextBtn = document.getElementById('btn-reveal-next');
+    if (lesson.id < 14) {
+      nextBtn.style.display = 'inline-block';
+      const nextId = lesson.id + 1;
+      const canNext = ClassroomProgress.isUnlocked(nextId);
+      nextBtn.disabled = !canNext;
+      nextBtn.textContent = canNext ? `下一关（第 ${nextId} 课）` : '下一关（尚未解锁）';
+    } else {
+      nextBtn.style.display = 'none';
+      nextBtn.disabled = false;
+    }
+    ov.classList.add('open');
+  }
+  hide() { document.getElementById('reveal-overlay').classList.remove('open'); }
+  bindOnce(app) {
+    if (this._bound) return;
+    this._bound = true;
+    document.getElementById('btn-reveal-map').addEventListener('click', () => {
+      this.hide();
+      app.exitClassroomToMap();
+    });
+    document.getElementById('btn-reveal-replay').addEventListener('click', () => {
+      this.hide();
+      app.replayLesson();
+    });
+    document.getElementById('btn-reveal-next').addEventListener('click', () => {
+      const nextId = app.currentLessonId + 1;
+      if (!ClassroomProgress.isUnlocked(nextId)) return;
+      this.hide();
+      app.startLessonStory(nextId);
+    });
+  }
+}
+
+class ClassroomGameController {
+  constructor(sandbox, app) {
+    this.sandbox = sandbox;
+    this.app = app;
+    this.state = new GameState();
+    this.refs = sandbox.refs;
+    this.circle = new CircleRenderer(this.refs, this.state);
+    this.evolution = new EvolutionEngine(this.state, this.circle);
+    this.lesson = null;
+    this.betOption = null;
+    this.autoTimer = null;
+    this.paused = false;
+    this._evolveHandler = null;
+  }
+
+  start(lesson, betIndex) {
+    const audio = AudioManager.get();
+    audio.ensureContext();
+    audio.stopBGM();
+    audio.startBGM();
+    this.lesson = lesson;
+    this.betOption = lesson.options[betIndex];
+    this.stopAuto();
+    const nodes = LessonConfig.buildNodes(lesson);
+    this.state.reset(lesson.playerCount);
+    this.state.noiseEnabled = !!lesson.forcedNoise;
+    nodes.forEach((r, i) => { this.state.nodes[i] = r; });
+
+    this.refs.screenGame.classList.add('classroom-mode');
+    this.refs.unitPanel.querySelector('#panel-title').textContent = '本关角色图鉴（悬停查看规则）';
+    this.renderCodex();
+    this.app.ui.showScreen('screen-game');
+    this.updateRoundUI();
+    this.circle.evolutionRunning = false;
+    this.circle.buildRing(true, lesson.radiusHint);
+    for (let i = 0; i < lesson.playerCount; i++) {
+      if (this.state.nodes[i]) this.circle.setSlotStrategy(i, this.state.nodes[i], true);
+    }
+    this.setEvolveButtonState();
+    this.bindClassroomControls();
+    this.bindClassroomTooltips();
+  }
+
+  renderCodex() {
+    const roles = [...new Set(this.lesson.cast.map(c => c.role))];
+    const list = this.refs.paletteList;
+    list.innerHTML = '';
+    roles.forEach(id => {
+      const c = this.lesson.cast.find(x => x.role === id);
+      const r = RoleVisuals.roles[id];
+      const unit = document.createElement('div');
+      unit.className = 'palette-unit';
+      unit.dataset.strategy = id;
+      unit.appendChild(RoleVisuals.createBall(id, 40));
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = c ? `${c.storyName}（${r.name}）` : r.name;
+      const beh = document.createElement('div');
+      beh.className = 'codex-behavior';
+      beh.textContent = r.logic;
+      unit.appendChild(name);
+      unit.appendChild(beh);
+      list.appendChild(unit);
+    });
+  }
+
+  bindClassroomTooltips() {
+    if (this._tooltipsBound) return;
+    this._tooltipsBound = true;
+    const panel = this.sandbox.panel;
+    const cc = this.refs.circleContainer;
+    cc.addEventListener('mouseover', (e) => {
+      if (!this.refs.screenGame.classList.contains('classroom-mode')) return;
+      const slot = e.target.closest('.slot.filled');
+      if (!slot?.dataset.strategy) return;
+      const rect = slot.getBoundingClientRect();
+      panel.showTooltip(slot.dataset.strategy, rect.left + rect.width / 2, rect.top);
+    });
+    cc.addEventListener('mouseout', (e) => {
+      if (!this.refs.screenGame.classList.contains('classroom-mode')) return;
+      const slot = e.target.closest('.slot.filled');
+      if (!slot) return;
+      const rel = e.relatedTarget?.closest?.('.slot.filled');
+      if (!rel || rel !== slot) panel.hideTooltip();
+    });
+    this.refs.paletteList.addEventListener('mouseover', (e) => {
+      if (!this.refs.screenGame.classList.contains('classroom-mode')) return;
+      const unit = e.target.closest('.palette-unit');
+      if (!unit?.dataset.strategy) return;
+      const rect = unit.getBoundingClientRect();
+      panel.showTooltip(unit.dataset.strategy, rect.left + rect.width / 2, rect.top);
+    });
+    this.refs.paletteList.addEventListener('mouseout', (e) => {
+      if (!this.refs.screenGame.classList.contains('classroom-mode')) return;
+      if (!e.relatedTarget || !this.refs.paletteList.contains(e.relatedTarget)) panel.hideTooltip();
+    });
+  }
+
+  updateRoundUI() {
+    this.refs.roundDisplay.textContent = `第 ${this.state.round} 轮 / 共 ${this.lesson.targetRounds} 轮`;
+  }
+
+  setEvolveButtonState() {
+    const btn = this.refs.btnEvolve;
+    const mono = GameState.monocultureRole(this.state);
+    const canReveal = this.state.round >= this.lesson.targetRounds || mono;
+    if (canReveal) {
+      btn.textContent = '查看结局';
+      btn.classList.add('visible', 'reveal-ready');
+    } else {
+      btn.textContent = '▶ 演变';
+      btn.classList.toggle('visible', this.state.isFull() && !this.evolution.running);
+      btn.classList.remove('reveal-ready');
+    }
+  }
+
+  bindClassroomControls() {
+    if (this._evolveHandler) this.refs.btnEvolve.removeEventListener('click', this._evolveHandler);
+    this._evolveHandler = () => this.onEvolveClick();
+    this.refs.btnEvolve.addEventListener('click', this._evolveHandler);
+
+    document.getElementById('btn-classroom-exit').onclick = () => {
+      if (confirm('确定退出到课程地图？当前关卡进度不会保存。')) this.app.exitClassroomToMap();
+    };
+    document.getElementById('btn-classroom-rules').onclick = () => GameRules.openModal();
+    document.getElementById('btn-classroom-skip').onclick = () => this.skipToEnd();
+    const autoCb = document.getElementById('classroom-auto');
+    const pauseBtn = document.getElementById('btn-classroom-pause');
+    autoCb.onchange = () => {
+      if (autoCb.checked) { this.paused = false; pauseBtn.style.display = 'inline-block'; this.startAuto(); }
+      else { this.stopAuto(); pauseBtn.style.display = 'none'; }
+    };
+    pauseBtn.onclick = () => {
+      this.paused = !this.paused;
+      pauseBtn.textContent = this.paused ? '继续' : '暂停';
+      if (!this.paused) this.startAuto();
+      else this.stopAuto();
+    };
+  }
+
+  async onEvolveClick() {
+    if (this.state.round >= this.lesson.targetRounds || GameState.monocultureRole(this.state)) {
+      this.finishLesson();
+      return;
+    }
+    if (this.evolution.running) return;
+    AudioManager.get().playEvolveClick();
+    await this.runOneRound(false);
+    if (GameState.monocultureRole(this.state)) {
+      this.stopAuto();
+      this.finishLesson();
+      return;
+    }
+    if (this.state.round >= this.lesson.targetRounds) this.stopAuto();
+    this.setEvolveButtonState();
+    if (document.getElementById('classroom-auto').checked && !this.paused &&
+        this.state.round < this.lesson.targetRounds && !GameState.monocultureRole(this.state)) {
+      this.startAuto();
+    }
+  }
+
+  async runOneRound(fast) {
+    this.circle.evolutionRunning = true;
+    this.refs.btnEvolve.classList.remove('visible');
+    await this.evolution.runRound({
+      fast,
+      immortalIndices: this.lesson.immortalIndices || []
+    });
+    this.updateRoundUI();
+    this.circle.evolutionRunning = false;
+    this.setEvolveButtonState();
+  }
+
+  async skipToEnd() {
+    this.stopAuto();
+    while (this.state.round < this.lesson.targetRounds && !GameState.monocultureRole(this.state)) {
+      await this.runOneRound(true);
+    }
+    this.setEvolveButtonState();
+    this.finishLesson();
+  }
+
+  startAuto() {
+    this.stopAuto();
+    this.autoTimer = setInterval(() => {
+      if (this.paused || this.evolution.running) return;
+      if (this.state.round >= this.lesson.targetRounds || GameState.monocultureRole(this.state)) {
+        this.stopAuto();
+        return;
+      }
+      this.onEvolveClick();
+    }, 800);
+  }
+
+  stopAuto() {
+    if (this.autoTimer) { clearInterval(this.autoTimer); this.autoTimer = null; }
+  }
+
+  finishLesson() {
+    this.stopAuto();
+    const isCorrect = this.lesson.anyAnswerCorrect || !!this.betOption.isCorrect;
+    this.app.reveal.show(this.lesson, this.betOption, isCorrect);
+  }
+
+  teardown() {
+    this.stopAuto();
+    AudioManager.get().stopBGM();
+    if (this._evolveHandler) this.refs.btnEvolve.removeEventListener('click', this._evolveHandler);
+    this.refs.screenGame.classList.remove('classroom-mode');
+    this.refs.unitPanel.querySelector('#panel-title').textContent = '13 种策略';
+    this.refs.btnEvolve.textContent = '▶ 演变';
+    this.refs.btnEvolve.classList.remove('reveal-ready');
+    document.getElementById('classroom-auto').checked = false;
+    document.getElementById('btn-classroom-pause').style.display = 'none';
+    this.circle.clearAll();
+    this.sandbox.panel.render();
+  }
+}
+
+class App {
+  constructor() {
+    this.sandbox = new GameLoop();
+    this.currentLessonId = 1;
+  }
+  init() {
+    this.sandbox.init();
+    this.refs = this.sandbox.refs;
+    this.ui = this.sandbox.ui;
+    this.ui.registerScreens([
+      document.getElementById('screen-menu'),
+      document.getElementById('screen-count'),
+      document.getElementById('screen-classroom-map'),
+      document.getElementById('screen-story'),
+      document.getElementById('screen-game')
+    ]);
+    this.mainMenu = new MainMenu(this.refs, this);
+    this.classroomMap = new ClassroomMap(this.refs, this);
+    this.story = new StorySequence(this.refs, this);
+    this.classroomGame = new ClassroomGameController(this.sandbox, this);
+    this.reveal = new RevealModal(this.refs, this);
+    this.mainMenu.render();
+    this.story.bindOnce();
+    this.reveal.bindOnce(this);
+    document.getElementById('btn-map-back').addEventListener('click', () => this.goMainMenu());
+    this.bindAudioToggles();
+    document.getElementById('btn-sandbox-rules').addEventListener('click', () => GameRules.openModal());
+    document.getElementById('btn-rules-close').addEventListener('click', () => GameRules.closeModal());
+    document.getElementById('btn-dominance-ok').addEventListener('click', () => this.sandbox.hideDominanceEnd());
+    document.getElementById('rules-overlay').addEventListener('click', e => {
+      if (e.target.id === 'rules-overlay') GameRules.closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.refs.screenGame.classList.contains('active') &&
+          this.refs.screenGame.classList.contains('classroom-mode')) {
+        if (confirm('退出到课程地图？')) this.exitClassroomToMap();
+      }
+    });
+  }
+  bindAudioToggles() {
+    const audio = AudioManager.get();
+    audio.updateToggleButtons();
+    const toggle = () => {
+      audio.ensureContext();
+      audio.toggleMute();
+      audio.updateToggleButtons();
+    };
+    document.getElementById('btn-audio-menu').addEventListener('click', toggle);
+    document.getElementById('btn-audio-esc').addEventListener('click', toggle);
+  }
+
+  goMainMenu() {
+    this.story.clearTimer();
+    this.classroomGame.teardown();
+    this.reveal.hide();
+    AudioManager.get().stopBGM();
+    this.ui.showScreen('screen-menu');
+  }
+  startSandbox() {
+    this.classroomGame.teardown();
+    this.ui.showScreen('screen-count');
+  }
+  openClassroomMap() {
+    AudioManager.get().stopBGM();
+    this.classroomMap.render();
+    this.ui.showScreen('screen-classroom-map');
+  }
+  startLessonStory(id) {
+    if (!ClassroomProgress.isUnlocked(id)) return;
+    this.currentLessonId = id;
+    const lesson = LessonConfig.getLesson(id);
+    this.story.start(lesson);
+  }
+  replayLesson() {
+    this.classroomGame.teardown();
+    const lesson = LessonConfig.getLesson(this.currentLessonId);
+    this.story.start(lesson);
+  }
+  exitClassroomToMap() {
+    this.story.clearTimer();
+    this.classroomGame.teardown();
+    this.reveal.hide();
+    this.openClassroomMap();
+  }
+}
+
+/* ===== GameLoop ===== */
+class GameLoop {
+  constructor() {
+    this.state = new GameState();
+    this.refs = {};
+    this.dominanceEnded = false;
+  }
+
+  cacheRefs() {
+    this.refs = {
+      screens: [document.getElementById('screen-menu'), document.getElementById('screen-count'), document.getElementById('screen-game')],
+      btnStart: document.getElementById('btn-start'),
+      countInput: document.getElementById('count-input'),
+      countHint: document.getElementById('count-hint'),
+      noiseToggle: document.getElementById('noise-toggle'),
+      presetBtns: document.getElementById('preset-btns'),
+      btnGenerate: document.getElementById('btn-generate'),
+      btnEsc: document.getElementById('btn-esc'),
+      roundDisplay: document.getElementById('round-display'),
+      arena: document.getElementById('arena'),
+      arenaScaler: document.getElementById('arena-scaler'),
+      circleContainer: document.getElementById('circle-container'),
+      linesSvg: document.getElementById('lines-svg'),
+      btnEvolve: document.getElementById('btn-evolve'),
+      unitPanel: document.getElementById('unit-panel'),
+      panelTab: document.getElementById('panel-tab'),
+      paletteList: document.getElementById('palette-list'),
+      tooltip: document.getElementById('tooltip'),
+      escOverlay: document.getElementById('esc-overlay'),
+      saveSlotsPanel: document.getElementById('save-slots-panel'),
+      btnClear: document.getElementById('btn-clear'),
+      btnRandom: document.getElementById('btn-random'),
+      btnGameRules: document.getElementById('btn-game-rules'),
+      screenGame: document.getElementById('screen-game')
+    };
+  }
+
+  init() {
+    this.cacheRefs();
+    this.ui = new UIManager(this.refs);
+    this.save = new SaveManager(this.refs);
+    this.circle = new CircleRenderer(this.refs, this.state);
+    this.panel = new UnitPanel(this.refs);
+    this.evolution = new EvolutionEngine(this.state, this.circle);
+    this.drag = new DragDropManager(this.refs, this.state, this.circle, () => this.circle.updateEvolveButton());
+    this.panel.render();
+    this.ui.renderPresetButtons(id => {
+      const n = this.ui.validateCount(this.refs.countInput.value);
+      if (!n) return;
+      this.state.pendingPreset = this.ui.buildPresetLayout(id, n);
+      this.refs.countHint.textContent = `已选预设，点击「生成圆环」开始`;
+    });
+    this.bindEvents();
+  }
+
+  bindEvents() {
+    const r = this.refs;
+    document.querySelectorAll('.quick-count').forEach(btn => {
+      btn.addEventListener('click', () => { r.countInput.value = btn.dataset.n; r.countHint.textContent = ''; this.state.pendingPreset = null; });
+    });
+    r.btnGenerate.addEventListener('click', () => {
+      AudioManager.get().ensureContext();
+      const n = this.ui.validateCount(r.countInput.value);
+      if (!n) return;
+      this.startGame(n);
+    });
+    r.btnEsc.addEventListener('click', () => { if (r.screenGame.classList.contains('active')) this.ui.toggleEsc(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && r.screenGame.classList.contains('active') &&
+          !r.screenGame.classList.contains('classroom-mode')) this.ui.toggleEsc();
+    });
+    r.escOverlay.querySelectorAll('.esc-action').forEach(btn => {
+      btn.addEventListener('click', () => this.handleEsc(btn.dataset.action));
+    });
+    r.btnEvolve.addEventListener('click', () => this.runEvolve());
+    r.panelTab.addEventListener('click', () => this.panel.expand());
+    r.btnClear.addEventListener('click', () => this.clearRing());
+    r.btnRandom.addEventListener('click', () => this.randomFill());
+    r.btnGameRules.addEventListener('click', () => GameRules.openModal());
+    r.paletteList.addEventListener('mouseenter', e => {
+      const unit = e.target.closest('.palette-unit');
+      if (!unit) return;
+      const rect = unit.getBoundingClientRect();
+      this.panel.showTooltip(unit.dataset.strategy, rect.left + rect.width / 2, rect.top);
+    }, true);
+    r.paletteList.addEventListener('mouseleave', e => {
+      if (!e.relatedTarget || !r.paletteList.contains(e.relatedTarget)) this.panel.hideTooltip();
+    }, true);
+    this.drag.bind();
+    window.addEventListener('resize', () => {
+      if (this.state.playerCount && r.screenGame.classList.contains('active')) this.circle.buildRing(false);
+    });
+  }
+
+  startGame(n) {
+    this.hideDominanceEnd();
+    const preset = this.state.pendingPreset;
+    this.state.reset(n);
+    this.state.noiseEnabled = this.refs.noiseToggle.checked;
+    if (preset && preset.length === n) {
+      for (let i = 0; i < n; i++) this.state.nodes[i] = preset[i];
+    }
+    this.state.pendingPreset = null;
+    this.ui.showScreen('screen-game');
+    this.ui.setRoundText(0);
+    this.panel.expand();
+    this.circle.evolutionRunning = false;
+    this.circle.buildRing(true);
+    if (preset) {
+      for (let i = 0; i < n; i++) if (this.state.nodes[i]) this.circle.setSlotStrategy(i, this.state.nodes[i], true);
+    }
+  }
+
+  hideDominanceEnd() {
+    document.getElementById('dominance-overlay').classList.remove('open');
+    this.dominanceEnded = false;
+  }
+
+  showDominanceEnd(roleId) {
+    const name = RoleVisuals.roles[roleId]?.name || roleId;
+    document.getElementById('dominance-text').textContent = `${name}统治了这场博弈`;
+    document.getElementById('dominance-overlay').classList.add('open');
+    this.dominanceEnded = true;
+    this.circle.evolutionRunning = false;
+    this.refs.btnEvolve.classList.remove('visible');
+    this.ui.setRoundText(`第 ${this.state.round} 轮 · 单一策略统治`);
+  }
+
+  async runEvolve() {
+    if (!this.state.isFull() || this.evolution.running || this.dominanceEnded) return;
+    AudioManager.get().playEvolveClick();
+    this.circle.evolutionRunning = true;
+    this.refs.btnEvolve.classList.remove('visible');
+    this.panel.collapse();
+    await this.evolution.runRound();
+    this.ui.setRoundText(this.state.round);
+    this.circle.evolutionRunning = false;
+    const mono = GameState.monocultureRole(this.state);
+    if (mono) {
+      this.showDominanceEnd(mono);
+      return;
+    }
+    this.circle.updateEvolveButton();
+  }
+
+  clearRing() {
+    this.hideDominanceEnd();
+    for (let i = 0; i < this.state.playerCount; i++) {
+      this.state.nodes[i] = null;
+      this.circle.clearSlot(i);
+    }
+    this.state.cumulativeScores = Array(this.state.playerCount).fill(0);
+    this.circle.updateEvolveButton();
+  }
+
+  randomFill() {
+    const ids = RoleVisuals.getRoleIds();
+    for (let i = 0; i < this.state.playerCount; i++) {
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      this.state.nodes[i] = id;
+      this.circle.setSlotStrategy(i, id);
+    }
+    this.circle.updateEvolveButton();
+  }
+
+  handleEsc(action) {
+    switch (action) {
+      case 'resume': this.ui.closeEsc(); break;
+      case 'save':
+        this.save.renderSlotButtons('save', idx => {
+          this.save.save(idx, this.state);
+          alert(`已保存到档位 ${idx + 1}`);
+        });
+        break;
+      case 'load':
+        this.save.renderSlotButtons('load', (idx, data) => {
+          if (!data) return;
+          this.state.deserialize(data);
+          this.refs.noiseToggle.checked = this.state.noiseEnabled;
+          this.ui.closeEsc();
+          this.ui.showScreen('screen-game');
+          this.ui.setRoundText(this.state.round);
+          this.panel.expand();
+          this.circle.buildRing(false);
+          for (let i = 0; i < this.state.playerCount; i++) {
+            if (this.state.nodes[i]) this.circle.setSlotStrategy(i, this.state.nodes[i], false);
+            if (this.state.cumulativeScores[i]) {
+              const rs = this.state.roundScores.length ? this.state.roundScores[this.state.roundScores.length - 1][i] : 0;
+              this.circle.updateScoreLabel(i, this.state.cumulativeScores[i], rs);
+            }
+          }
+          this.circle.updateEvolveButton();
+        });
+        break;
+      case 'quit':
+        if (confirm('确定退出到主菜单？未保存进度将丢失')) {
+          this.ui.closeEsc();
+          this.ui.showScreen('screen-menu');
+          this.circle.clearAll();
+          this.state.reset(0);
+        }
+        break;
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => new App().init());
+</script>
+</body>
+</html>
