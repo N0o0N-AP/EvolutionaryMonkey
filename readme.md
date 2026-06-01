@@ -28,15 +28,10 @@
 
 ## 快速开始
 
-本项目是**单文件应用**，无构建、无依赖、无需服务器。
+本项目无构建、无依赖、无需服务器。
 
-```bash
-git clone https://github.com/你的用户名/你的仓库名.git
-# 然后双击打开
-open index.html
-```
 
-或直接下载仓库中的 `index.html`，**双击即可在浏览器运行**。
+或直接下载仓库中的 `演化人类.html`，**双击即可在浏览器运行**。
 
 > 提示：由于浏览器策略，音频需在首次点击页面后激活。
 
@@ -79,7 +74,7 @@ open index.html
 
 ## 技术栈
 
-- 单文件 `index.html`（HTML5 + CSS3 + Vanilla JS）
+- 单文件 `演化人类.html`（HTML5 + CSS3 + Vanilla JS）
 - DOM + CSS Transform 渲染（非 Canvas），原生支持拖拽与动画
 - ES6 Class 模块化架构
 - localStorage 存档与课堂解锁进度
