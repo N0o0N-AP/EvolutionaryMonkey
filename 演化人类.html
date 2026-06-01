@@ -83,6 +83,19 @@
     #arena-scaler { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transform-origin: center; }
     #circle-container { position: relative; width: 100%; height: 100%; transition: transform 0.3s ease; }
     #lines-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+    .competition-line { stroke-dasharray: 6 4; stroke-width: 2.5; opacity: 0.95; }
+    @keyframes comp-line-fade { from { opacity: 0.95; } to { opacity: 0; } }
+    .slot.immigrant-mutate .ball-wrap { animation: immigrant-flash 0.65s ease forwards; }
+    @keyframes immigrant-flash {
+      0% { filter: brightness(3) saturate(0.2); transform: scale(0.85); }
+      45% { filter: brightness(2.5); }
+      100% { filter: none; transform: scale(1); }
+    }
+    #arena.immigration-pulse { animation: arena-pulse 0.35s ease; }
+    @keyframes arena-pulse {
+      0%, 100% { box-shadow: inset 0 0 0 0 rgba(255,255,255,0); }
+      50% { box-shadow: inset 0 0 80px 20px rgba(255,255,255,0.12); }
+    }
     .slot {
       position: absolute; width: 60px; height: 60px; border-radius: 50%;
       border: 2px solid #444; background: transparent;
@@ -580,6 +593,7 @@
       <button type="button" class="btn btn-tool" id="btn-clear">清空圆环</button>
       <button type="button" class="btn btn-tool" id="btn-random">随机填充</button>
       <button type="button" class="btn btn-tool" id="btn-game-rules">游戏规则</button>
+      <label class="noise-row" style="font-size:0.78rem;margin:0"><input type="checkbox" id="immigration-toggle" checked> 外部移民</label>
     </div>
     <div id="arena-wrap">
       <div id="arena">
@@ -805,7 +819,9 @@ class GameState {
     this.round = 0;
     this.roundScores = [];
     this.cumulativeScores = [];
+    this.scoreHistory = [];
     this.noiseEnabled = false;
+    this.immigrationEnabled = true;
     this.histories = new Map();
     this.grudgeMap = new Map();
     this.pendingPreset = null;
@@ -819,8 +835,25 @@ class GameState {
     this.round = 0;
     this.roundScores = [];
     this.cumulativeScores = Array(count).fill(0);
+    this.scoreHistory = Array.from({ length: count }, () => []);
     this.histories = new Map();
     this.grudgeMap = new Map();
+  }
+
+  static getFitness(state, index) {
+    const h = state.scoreHistory[index] || [];
+    const avg = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+    return 1 + avg;
+  }
+
+  pushRoundScores(scores) {
+    if (!this.scoreHistory.length) this.scoreHistory = Array.from({ length: this.playerCount }, () => []);
+    for (let i = 0; i < this.playerCount; i++) {
+      if (!this.nodes[i]) continue;
+      if (!this.scoreHistory[i]) this.scoreHistory[i] = [];
+      this.scoreHistory[i].push(scores[i]);
+      if (this.scoreHistory[i].length > 5) this.scoreHistory[i].shift();
+    }
   }
 
   isFull() { return this.nodes.length > 0 && this.nodes.every(n => n !== null); }
@@ -849,7 +882,9 @@ class GameState {
       round: this.round,
       roundScores: this.roundScores.map(r => [...r]),
       cumulativeScores: [...this.cumulativeScores],
+      scoreHistory: this.scoreHistory.map(h => [...h]),
       noiseEnabled: this.noiseEnabled,
+      immigrationEnabled: this.immigrationEnabled,
       histories: [...this.histories.entries()],
       grudgeMap: [...this.grudgeMap.entries()]
     };
@@ -861,7 +896,10 @@ class GameState {
     this.round = data.round || 0;
     this.roundScores = (data.roundScores || []).map(r => [...r]);
     this.cumulativeScores = data.cumulativeScores || Array(this.playerCount).fill(0);
+    this.scoreHistory = (data.scoreHistory || []).map(h => [...h]);
+    while (this.scoreHistory.length < this.playerCount) this.scoreHistory.push([]);
     this.noiseEnabled = !!data.noiseEnabled;
+    this.immigrationEnabled = data.immigrationEnabled !== false;
     this.histories = new Map(data.histories || []);
     this.grudgeMap = new Map(data.grudgeMap || []);
   }
@@ -1028,6 +1066,20 @@ class StrategyLogic {
 
 /* ===== EvolutionEngine ===== */
 class EvolutionEngine {
+  static WIN_TABLE = [0.50, 0.55, 0.70, 0.82, 0.90, 0.96, 0.995];
+
+  static getWinProbability(diff) {
+    const d = Math.abs(diff);
+    const clamped = Math.min(d, 6);
+    const floor = Math.floor(clamped);
+    const ceil = Math.min(floor + 1, 6);
+    const fraction = clamped - floor;
+    const baseP = EvolutionEngine.WIN_TABLE[floor];
+    const nextP = EvolutionEngine.WIN_TABLE[ceil];
+    const p = baseP + (nextP - baseP) * fraction;
+    return diff > 0 ? p : (1 - p);
+  }
+
   constructor(state, circle) {
     this.state = state;
     this.circle = circle;
@@ -1104,8 +1156,10 @@ class EvolutionEngine {
         this.state.cumulativeScores[i] += scores[i];
         if (!fast) this.circle.updateScoreLabel(i, this.state.cumulativeScores[i], scores[i]);
       }
+      this.state.pushRoundScores(scores);
 
-      const deathCount = Math.max(1, Math.ceil(N / 5));
+      // 每满 7 人淘汰 1 人：7→1，14→2，21→3；不足 7 人时仍至少淘汰 1 人
+      const deathCount = Math.max(1, Math.floor(N / 7));
       const immortal = new Set(opts.immortalIndices || []);
       const deathCandidates = [...Array(N).keys()].filter(i => this.state.nodes[i] && !immortal.has(i));
       const actualDeathCount = deathCandidates.length
@@ -1121,26 +1175,36 @@ class EvolutionEngine {
           await this.circle.animateDeath(idx);
         } else this.circle.clearSlot(idx);
         this.state.nodes[idx] = null;
+        this.state.scoreHistory[idx] = [];
         this.clearIndexHistory(idx);
       }
 
-      const births = [];
-      for (let i = 0; i < N; i++) {
-        if (this.state.nodes[i] !== null) continue;
-        const donor = this.pickDonor(i, scores, victims);
-        if (donor != null && this.state.nodes[donor]) {
-          this.state.nodes[i] = this.state.nodes[donor];
-          births.push({ index: i, role: this.state.nodes[donor] });
+      const emptySlots = [...Array(N).keys()].filter(i => this.state.nodes[i] === null);
+      for (const i of emptySlots) {
+        const result = this.competeForEmptySlot(i, victims);
+        if (!result) continue;
+        const { donor, diff, winProb } = result;
+        const role = this.state.nodes[donor];
+        this.state.nodes[i] = role;
+        this.state.scoreHistory[i] = [...(this.state.scoreHistory[donor] || [])];
+        if (fast) {
+          this.circle.setSlotStrategy(i, role, false);
+        } else {
+          if (result.left != null && result.right != null) {
+            this.circle.showCompetitionLine(i, donor, winProb);
+            const audio = AudioManager.get();
+            if (Math.abs(diff) >= 3) audio.playBirthDominant();
+            else if (Math.abs(diff) < 2) audio.playBirthClose();
+            else audio.playBirth();
+            await this.delay(320);
+          } else {
+            AudioManager.get().playBirth();
+          }
+          await this.circle.animateBirth(i, role);
         }
       }
-      if (fast) {
-        for (const b of births) this.circle.setSlotStrategy(b.index, b.role, false);
-      } else {
-        for (const b of births) {
-          AudioManager.get().playBirth();
-          await this.circle.animateBirth(b.index, b.role);
-        }
-      }
+
+      await this.applyImmigration(fast, opts);
 
     this.appendHistories(actions, scores, N);
     this.state.roundScores.push([...scores]);
@@ -1182,25 +1246,58 @@ class EvolutionEngine {
     }
   }
 
-  pickDonor(emptyIdx, scores, victims) {
-    const visited = new Set([emptyIdx]);
-    let frontier = [this.state.left(emptyIdx), this.state.right(emptyIdx)];
-    while (frontier.length) {
-      const alive = frontier.filter(i => !victims.has(i) && this.state.nodes[i]);
-      if (alive.length) {
-        return alive.reduce((best, c) => scores[c] > scores[best] ? c : best, alive[0]);
-      }
-      const next = [];
-      for (const idx of frontier) {
-        for (const nb of [this.state.left(idx), this.state.right(idx)]) {
-          if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
-        }
-      }
-      frontier = next;
+  findNearestAlive(emptyIdx, goLeft, victims) {
+    const N = this.state.playerCount;
+    let idx = goLeft ? this.state.left(emptyIdx) : this.state.right(emptyIdx);
+    for (let step = 0; step < N - 1; step++) {
+      if (!victims.has(idx) && this.state.nodes[idx]) return idx;
+      idx = goLeft ? this.state.left(idx) : this.state.right(idx);
+      if (idx === emptyIdx) break;
     }
-    const any = [...Array(this.state.playerCount).keys()].filter(i => !victims.has(i) && this.state.nodes[i]);
-    if (!any.length) return null;
-    return any[Math.floor(Math.random() * any.length)];
+    return null;
+  }
+
+  competeForEmptySlot(emptyIdx, victims) {
+    const left = this.findNearestAlive(emptyIdx, true, victims);
+    const right = this.findNearestAlive(emptyIdx, false, victims);
+    if (!left && !right) return null;
+    if (left && !right) return { donor: left, left, right: null, diff: 0, winProb: 1 };
+    if (right && !left) return { donor: right, left: null, right, diff: 0, winProb: 1 };
+    const diff = GameState.getFitness(this.state, left) - GameState.getFitness(this.state, right);
+    const leftWins = Math.random() < EvolutionEngine.getWinProbability(diff);
+    const donor = leftWins ? left : right;
+    const winProb = leftWins ? EvolutionEngine.getWinProbability(diff) : (1 - EvolutionEngine.getWinProbability(diff));
+    return { donor, left, right, diff, winProb };
+  }
+
+  async applyImmigration(fast, opts) {
+    if (opts.enableImmigration === false) return;
+    const N = this.state.playerCount;
+    const filled = [...Array(N).keys()].filter(i => this.state.nodes[i]);
+    if (!filled.length) return;
+    const mutationCount = Math.min(3, Math.max(1, Math.ceil(filled.length * 0.02)));
+    const pool = filled.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const targets = pool.slice(0, mutationCount);
+    const audio = AudioManager.get();
+    if (!fast && targets.length) audio.playImmigration();
+    for (const idx of targets) {
+      const role = Math.random() < 0.5 ? 'cooperator' : 'joker';
+      this.state.nodes[idx] = role;
+      this.state.scoreHistory[idx] = [];
+      if (fast) {
+        this.circle.setSlotStrategy(idx, role, false);
+      } else {
+        await this.circle.animateImmigration(idx, role);
+      }
+    }
+    if (!fast && targets.length) {
+      this.circle.pulseArenaImmigration();
+      await this.delay(200);
+    }
   }
 
   pickRandomFromPool(pool, count) {
@@ -1417,6 +1514,46 @@ class CircleRenderer {
       setTimeout(() => { slot.classList.remove('birthing'); resolve(); }, 550);
     });
   }
+
+  showCompetitionLine(emptyIdx, winnerIdx, winProb) {
+    const svg = this.refs.linesSvg;
+    const pe = this.positions[emptyIdx];
+    const pw = this.positions[winnerIdx];
+    if (!pe || !pw) return;
+    let color = '#e17055';
+    if (winProb >= 0.9) color = '#fdcb6e';
+    else if (winProb >= 0.7) color = '#dfe6e9';
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', pe.x);
+    line.setAttribute('y1', pe.y);
+    line.setAttribute('x2', pw.x);
+    line.setAttribute('y2', pw.y);
+    line.setAttribute('stroke', color);
+    line.setAttribute('class', 'competition-line');
+    line.style.animation = 'comp-line-fade 0.6s ease forwards';
+    svg.appendChild(line);
+    setTimeout(() => { if (line.parentNode) line.remove(); }, 620);
+  }
+
+  animateImmigration(index, roleId) {
+    return new Promise(resolve => {
+      const slot = this.slotEls[index];
+      if (!slot) { resolve(); return; }
+      slot.classList.add('immigrant-mutate');
+      this.setSlotStrategy(index, roleId, false);
+      setTimeout(() => {
+        slot.classList.remove('immigrant-mutate');
+        resolve();
+      }, 650);
+    });
+  }
+
+  pulseArenaImmigration() {
+    const arena = this.refs.arena;
+    if (!arena) return;
+    arena.classList.add('immigration-pulse');
+    setTimeout(() => arena.classList.remove('immigration-pulse'), 380);
+  }
 }
 
 /* ===== UnitPanel ===== */
@@ -1504,6 +1641,7 @@ class DragDropManager {
     if (idx >= 0 && this.strategyId) {
       if (this.state.nodes[idx]) await this.circle.animateReplaceDeath(idx);
       this.state.nodes[idx] = this.strategyId;
+      if (this.state.scoreHistory) this.state.scoreHistory[idx] = [];
       this.circle.setSlotStrategy(idx, this.strategyId);
       if (this.onPlaced) this.onPlaced();
     }
@@ -1720,21 +1858,21 @@ class LessonConfig {
       revealTitle:'结局：背叛的成本高于收益', revealStory:'间谍第 1 轮骗到了补给，但第 2 轮，左右两座要塞同时切断了他的粮道。他每骗一次，就要付出双倍的封锁代价。即使他活着，得分也永远挤不进前 50%。15 轮后，要塞的缺口被高分的警卫自然填补——互惠策略不需要主动出击，只需要让背叛的成本高于收益。',
       revealTheory:'互惠策略形成防火墙，不是消灭威胁，而是让威胁的繁殖成本太高。合作者需要「带牙齿的同伴」才能生存。' },
     { id:5, name:'冤大头', themeColor:'#96CEB4', playerCount:8, radiusHint:200, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
-      storyBg:['东海渔港，8 艘渔船围港停泊。4 艘船老大是「冤大头」（傻子），永远先交货后收钱；4 艘是「强盗」（骗子），永远收货后赖账。渔港没有衙门，交易全凭口头约定。','你是港口的记账先生，每天黄昏统计盈亏。冤大头的船每轮都被骗走鱼获，得分 -1；强盗每轮白嫖，得分 +3——但冤大头永远不会改变策略。'],
+      storyBg:['东海渔港，8 艘渔船围港停泊，一船冤大头、一船强盗交错泊靠。冤大头永远先交货后收钱；强盗永远收货后赖账。渔港没有衙门，交易全凭口头约定。','你是港口的记账先生，每天黄昏统计盈亏。单看账本，强盗每轮白嫖得分更高，冤大头每轮净亏——可渔港还有一条规矩：随机沉船后，空码头由左右邻居按「近期表现」（最近几轮盈亏）掷骰竞争接盘，不是谁刚赢一局谁必胜。'],
       cast:[{role:'sucker',storyName:'冤大头',count:4},{role:'cheater',storyName:'强盗',count:4}],
       preplaced:[{role:'sucker',count:4,positions:'even'},{role:'cheater',count:4,positions:'odd'}],
       question:'15 轮后，港口里谁占主导？',
-      options:[{id:'A',label:'冤大头',roleRef:'sucker',isCorrect:false},{id:'B',label:'强盗',roleRef:'cheater',isCorrect:true},{id:'C',label:'互相制衡',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：港口挂满了黑旗', revealStory:'第 3 轮，冤大头 A 的船空了，他付不起船员的工钱，船被拍卖。得分最高的强盗买下了他的船——于是港口里又多了一艘强盗船。15 轮后，你翻开账本，发现 8 艘船挂的都是黑旗。',
-      revealTheory:'无条件的信任不是美德，而是对骗子的邀请函。没有识别能力的善良，在演化中注定灭绝。' },
-    { id:6, name:'以牙还牙', themeColor:'#FFEAA7', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
-      storyBg:['西域商道，10 个驼队围成休息圈。5 个是「镜子人」（复读机），5 个是「沙匪」（骗子）。商道上没有王法，只有规矩：你敬我一尺，我敬你一丈；你捅我一刀，我必还你一箭。','你是客栈掌柜，在篝火旁冷眼旁观。沙匪每次抢劫得手，下一轮必遭镜子人的联合报复；镜子人虽然偶尔吃亏，但长期得分更稳。'],
-      cast:[{role:'copycat',storyName:'镜子人',count:5},{role:'cheater',storyName:'沙匪',count:5}],
-      preplaced:[{role:'copycat',count:5,positions:'even'},{role:'cheater',count:5,positions:'odd'}],
-      question:'15 轮后，商道上哪方会赢？',
+      options:[{id:'A',label:'冤大头',roleRef:'sucker',isCorrect:true},{id:'B',label:'强盗',roleRef:'cheater',isCorrect:false},{id:'C',label:'互相制衡',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：黑旗与白帆在港口共存', revealStory:'你原以为强盗会吃光港口——毕竟他们每轮都赚得更多。可演变开始后，规律反过来了：强盗船一旦沉没，两侧往往只剩冤大头，空位只能被冤大头接盘；冤大头沉了，两侧强盗又会把黑旗插上去。15 轮后你清点泊位：冤大头往往更多，至少也与强盗势均力敌；强盗没有灭绝，却再也无法独占渔港。',
+      revealTheory:'单轮得分最低，不等于演化中注定灭绝。交错泊港时，空位竞争看的是近期适应度而非某一局的爆发；强盗虽常赢单轮，却未必在掷骰繁殖中占尽优势。冤大头用「接盘」机制活了下来——无条件的信任依然危险，但演化不会简单惩罚每一种善良。' },
+    { id:6, name:'以牙还牙', themeColor:'#FFEAA7', playerCount:12, radiusHint:240, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      storyBg:['西域商道，12 个驼队围成休息圈：8 支「镜子人」商队扎堆扎营，4 支「沙匪」散在对面。商道上没有王法，只有规矩：你敬我一尺，我敬你一丈；你捅我一刀，我必还你一箭。','你是客栈掌柜，在篝火旁冷眼旁观。沙匪抢得了一时便宜，但镜子人会立刻报复；更关键的是，戈壁上的沉船不算多——多数时候，只有熬得过报复、还能与同伴互助的驼队，才配接盘空出来的营地。'],
+      cast:[{role:'copycat',storyName:'镜子人',count:8},{role:'cheater',storyName:'沙匪',count:4}],
+      preplaced:[{role:'copycat',count:8,positions:[0,1,2,3,4,5,10,11]},{role:'cheater',count:4,positions:[6,7,8,9]}],
+      question:'20 轮后，商道上哪方会赢？',
       options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'沙匪',roleRef:'cheater',isCorrect:false},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：驼铃响彻戈壁', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮他的驼被射成了刺猬。他每骗一次，就要花 3 轮疗伤。15 轮后，商道上的沙匪缩在角落，而镜子人的驼铃声响彻戈壁。',
-      revealTheory:'当背叛会招致报复时，背叛就不再划算。报复能力不是暴力，而是让「合作」成为理性选择的信用背书。' },
+      revealTitle:'结局：驼铃压过沙匪的口哨', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮起左右都是竖起的箭垛。镜子人彼此合作得分更稳，沙匪要么在报复中得分归零，要么倒在随机沉船后把营地让给邻居。20 轮后你再看：镜子人的驼队占了大半休息圈，沙匪只剩零星几支还在苟延——报复没有消灭他们，却让合作成了主流。',
+      revealTheory:'当背叛会招致报复时，背叛就不再划算。减少无意义的沉船、让互助者有机会接盘，镜子人就能在演化中占优。报复能力不是暴力，而是让「合作」成为理性选择的信用背书。' },
     { id:7, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:true, targetRounds:15, editable:false,
       storyBg:['10 个镜子人围坐在「诚信酒馆」，发誓以牙还牙。但地板年久失修，每轮有 5% 的概率有人滑倒，手里的酒杯「意外」泼到邻居脸上——看起来像背叛，实则是失误。没有道歉机制，镜子人只看行动。','你是酒馆角落里弹琵琶的盲眼乐师，听见了每一次「背叛」背后的惊呼。一次滑倒引发的「背叛」，会触发报复，进而引发报复的报复……'],
       cast:[{role:'copycat',storyName:'镜子人',count:10}],
@@ -1878,6 +2016,16 @@ class AudioManager {
     this.playTone(660, 'sine', 0.3, 0, 0.25);
     this.playTone(880, 'sine', 0.3, 0.1, 0.2);
   }
+  playBirthDominant() {
+    this.playTone(880, 'sine', 0.15, 0, 0.28);
+    this.playTone(1100, 'sine', 0.1, 0.05, 0.22);
+  }
+  playBirthClose() {
+    this.playTone(440, 'triangle', 0.2, 0, 0.22);
+  }
+  playImmigration() {
+    this.playTone(660, 'sawtooth', 0.3, 0, 0.28);
+  }
   playScorePopup(score) {
     if (score > 0) this.playTone(523, 'triangle', 0.1, 0, 0.2);
     else if (score < 0) this.playTone(300, 'square', 0.15, 0, 0.22);
@@ -1956,8 +2104,10 @@ class GameRules {
       <ul>
         <li><strong>博弈</strong>：按各角色策略与历史，决定对每名邻居出「合作」或「背叛」；部分关卡开启 5%「误触」，可能随机反转你的选择。</li>
         <li><strong>计分</strong>：结算得分，圆环上出现连线颜色（双合作绿、双背叛红、一方吃亏橙）与飘字得分。</li>
-        <li><strong>死亡</strong>：约 <strong>1/5</strong> 的节点随机淘汰（至少 1 人），变为空位。</li>
-        <li><strong>出生</strong>：空位由左右邻居中<strong>本轮得分更高</strong>者的策略复制填充；邻居也死了则向更远寻找。</li>
+        <li><strong>死亡</strong>：每满 <strong>7</strong> 人随机淘汰 <strong>1</strong> 人（14 人淘汰 2 人，21 人淘汰 3 人，以此类推）；人数不足 7 时仍至少淘汰 1 人，变为空位。</li>
+        <li><strong>适应度</strong>：记录最近 <strong>5 轮</strong>得分，适应度 = <strong>1 + 近期平均分</strong>（开局前几轮按已有轮数平均）。累计分用于展示，也体现长期表现。</li>
+        <li><strong>出生</strong>：空位由左右方向<strong>最近存活者</strong>竞争；按双方适应度之差查表决定胜率（差 1 分约 55%，差 2 分约 70%，差 3 分以上约 82%～99.5%）。胜者策略复制到空位，并继承其近期得分记忆。</li>
+        <li><strong>外部移民</strong>（感染演变可关闭）：每轮结束后，约 2% 的存活者可能被强制替换为「合作者」或「混沌」。经典课堂不触发。</li>
       </ul>
       <p>多轮之后，某种策略会在圆环上越来越多——这就是<strong>演化</strong>。经典课堂中的故事模拟，均遵循以上规则。</p>
     `;
@@ -2461,7 +2611,8 @@ class ClassroomGameController {
     this.refs.btnEvolve.classList.remove('visible');
     await this.evolution.runRound({
       fast,
-      immortalIndices: this.lesson.immortalIndices || []
+      immortalIndices: this.lesson.immortalIndices || [],
+      enableImmigration: false
     });
     this.updateRoundUI();
     this.circle.evolutionRunning = false;
@@ -2615,6 +2766,7 @@ class GameLoop {
       countInput: document.getElementById('count-input'),
       countHint: document.getElementById('count-hint'),
       noiseToggle: document.getElementById('noise-toggle'),
+      immigrationToggle: document.getElementById('immigration-toggle'),
       presetBtns: document.getElementById('preset-btns'),
       btnGenerate: document.getElementById('btn-generate'),
       btnEsc: document.getElementById('btn-esc'),
@@ -2679,6 +2831,16 @@ class GameLoop {
     r.btnClear.addEventListener('click', () => this.clearRing());
     r.btnRandom.addEventListener('click', () => this.randomFill());
     r.btnGameRules.addEventListener('click', () => GameRules.openModal());
+    if (r.immigrationToggle) {
+      try {
+        const saved = localStorage.getItem('trustEvolution_immigration');
+        if (saved === '0') r.immigrationToggle.checked = false;
+      } catch (_) {}
+      r.immigrationToggle.addEventListener('change', () => {
+        this.state.immigrationEnabled = r.immigrationToggle.checked;
+        try { localStorage.setItem('trustEvolution_immigration', this.state.immigrationEnabled ? '1' : '0'); } catch (_) {}
+      });
+    }
     r.paletteList.addEventListener('mouseenter', e => {
       const unit = e.target.closest('.palette-unit');
       if (!unit) return;
@@ -2699,6 +2861,10 @@ class GameLoop {
     const preset = this.state.pendingPreset;
     this.state.reset(n);
     this.state.noiseEnabled = this.refs.noiseToggle.checked;
+    if (this.refs.immigrationToggle) {
+      this.state.immigrationEnabled = this.refs.immigrationToggle.checked;
+      try { localStorage.setItem('trustEvolution_immigration', this.state.immigrationEnabled ? '1' : '0'); } catch (_) {}
+    }
     if (preset && preset.length === n) {
       for (let i = 0; i < n; i++) this.state.nodes[i] = preset[i];
     }
@@ -2734,7 +2900,9 @@ class GameLoop {
     this.circle.evolutionRunning = true;
     this.refs.btnEvolve.classList.remove('visible');
     this.panel.collapse();
-    await this.evolution.runRound();
+    await this.evolution.runRound({
+      enableImmigration: this.state.immigrationEnabled !== false
+    });
     this.ui.setRoundText(this.state.round);
     this.circle.evolutionRunning = false;
     const mono = GameState.monocultureRole(this.state);
@@ -2752,6 +2920,7 @@ class GameLoop {
       this.circle.clearSlot(i);
     }
     this.state.cumulativeScores = Array(this.state.playerCount).fill(0);
+    this.state.scoreHistory = Array.from({ length: this.state.playerCount }, () => []);
     this.circle.updateEvolveButton();
   }
 
@@ -2760,6 +2929,7 @@ class GameLoop {
     for (let i = 0; i < this.state.playerCount; i++) {
       const id = ids[Math.floor(Math.random() * ids.length)];
       this.state.nodes[i] = id;
+      this.state.scoreHistory[i] = [];
       this.circle.setSlotStrategy(i, id);
     }
     this.circle.updateEvolveButton();
@@ -2779,6 +2949,7 @@ class GameLoop {
           if (!data) return;
           this.state.deserialize(data);
           this.refs.noiseToggle.checked = this.state.noiseEnabled;
+          if (this.refs.immigrationToggle) this.refs.immigrationToggle.checked = this.state.immigrationEnabled !== false;
           this.ui.closeEsc();
           this.ui.showScreen('screen-game');
           this.ui.setRoundText(this.state.round);
