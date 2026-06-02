@@ -2,9 +2,12 @@
  * Monte Carlo simulation matching 演化人类.html evolution rules
  * Run: node simulate-lessons.mjs
  * JSON: node simulate-lessons.mjs --json
+ * Embed: node simulate-lessons.mjs --embed-html
  */
+import fs from 'fs';
+
 const DETECTIVE_PROBE = ['C', 'D', 'C', 'C'];
-const WIN_TABLE = [0.50, 0.55, 0.70, 0.82, 0.90, 0.96, 0.995];
+const WIN_TABLE = [0.50, 0.60, 0.78, 0.90, 0.96, 0.99, 0.995];
 const TRIALS = 2000;
 const ROLE_NAMES = {
   cooperator: '合作者', cheater: '骗子', copycat: '复读机', sucker: '冤大头',
@@ -71,8 +74,17 @@ function buildNodes(lesson) {
 
 function getFitness(scoreHistory) {
   const h = scoreHistory || [];
-  const avg = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+  if (!h.length) return 1;
+  const avg = h.reduce((a, b) => a + b, 0) / h.length;
   return 1 + avg;
+}
+
+function seedNewbornScoreHistory(state, emptyIdx, donorIdx) {
+  const donorHistory = state.scoreHistory[donorIdx] || [];
+  const donorAvg = donorHistory.length
+    ? donorHistory.reduce((a, b) => a + b, 0) / donorHistory.length
+    : 0;
+  state.scoreHistory[emptyIdx] = [Math.max(0, Math.round(donorAvg * 10) / 10)];
 }
 
 function decide(role, neighborId, history, round, grudgeCtx, playerIndex) {
@@ -254,7 +266,7 @@ function runLessonOnce(lesson) {
       const donor = competeForEmpty(i, state, victims);
       if (donor != null) {
         state.nodes[i] = state.nodes[donor];
-        state.scoreHistory[i] = [...state.scoreHistory[donor]];
+        seedNewbornScoreHistory(state, i, donor);
       }
     }
 
@@ -489,4 +501,21 @@ for (const lesson of lessons) {
 
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(allStats, null, 2));
+}
+
+if (process.argv.includes('--embed-html')) {
+  const htmlPath = 'e:/AAA/Gamemakebyme/EvolutionaryMonkey/演化人类.html';
+  const statsLine = JSON.stringify(allStats);
+  let html = fs.readFileSync(htmlPath, 'utf8');
+  const startMarker = '/** 2000 次蒙特卡洛';
+  const endMarker = 'const SIM_ROLE_LABELS';
+  const startIdx = html.indexOf(startMarker);
+  const endIdx = html.indexOf(endMarker);
+  if (startIdx < 0 || endIdx < 0) throw new Error('markers not found');
+  const replacement =
+    '/** 2000 次蒙特卡洛，规则与游戏一致（死亡 1/6、近5轮权重、激进繁殖胜率、新生儿均分继承）。由 simulate-lessons.mjs 生成 */\n' +
+    `const LESSON_SIM_STATS = ${statsLine};\n\n`;
+  html = html.slice(0, startIdx) + replacement + html.slice(endIdx);
+  fs.writeFileSync(htmlPath, html, 'utf8');
+  console.log('embedded', statsLine.length, 'chars');
 }

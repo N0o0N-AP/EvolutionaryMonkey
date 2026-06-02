@@ -1,0 +1,276 @@
+﻿{
+  "1": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 0.1,
+      "B": 98.2,
+      "C": 1.7
+    },
+    "dominantPct": {
+      "cheater": 99.4,
+      "cooperator": 0.6
+    },
+    "avgShare": {
+      "cheater": 98.5,
+      "cooperator": 1.5
+    },
+    "monoEarlyPct": 95,
+    "avgCoopInteractPct": 0.7,
+    "avgDefectInteractPct": 99.3
+  },
+  "2": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 59.3,
+      "B": 33.3,
+      "C": 7.5
+    },
+    "dominantPct": {
+      "copycat": 63.6,
+      "cheater": 36.4
+    },
+    "avgShare": {
+      "copycat": 61.5,
+      "cheater": 38.5
+    },
+    "monoEarlyPct": 73.7,
+    "avgCoopInteractPct": 10.7,
+    "avgDefectInteractPct": 89.3
+  },
+  "3": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 83,
+      "B": 6.2,
+      "C": 10.9
+    },
+    "dominantPct": {
+      "cooperator": 87,
+      "cheater": 13.1
+    },
+    "avgShare": {
+      "cooperator": 67.8,
+      "cheater": 32.2
+    },
+    "monoEarlyPct": 0.4,
+    "avgCoopInteractPct": 55.6,
+    "avgDefectInteractPct": 44.4
+  },
+  "4": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 41,
+      "B": 2.1,
+      "C": 56.9
+    },
+    "dominantPct": {
+      "cooperator": 48.8,
+      "copycat": 48.2,
+      "cheater": 3.1
+    },
+    "avgShare": {
+      "copycat": 50.8,
+      "cooperator": 43.3,
+      "cheater": 5.9
+    },
+    "monoEarlyPct": 33.2,
+    "avgCoopInteractPct": 79.3,
+    "avgDefectInteractPct": 20.7
+  },
+  "5": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 38.7,
+      "B": 52.8,
+      "C": 8.6
+    },
+    "dominantPct": {
+      "cheater": 56.3,
+      "sucker": 43.7
+    },
+    "avgShare": {
+      "cheater": 60.2,
+      "sucker": 39.8
+    },
+    "monoEarlyPct": 57,
+    "avgCoopInteractPct": 30.1,
+    "avgDefectInteractPct": 69.9
+  },
+  "6": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 97.3,
+      "B": 0.9,
+      "C": 1.9
+    },
+    "dominantPct": {
+      "copycat": 99,
+      "cheater": 1
+    },
+    "avgShare": {
+      "copycat": 93.8,
+      "cheater": 6.2
+    },
+    "monoEarlyPct": 78.8,
+    "avgCoopInteractPct": 52.2,
+    "avgDefectInteractPct": 47.8
+  },
+  "7": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 100,
+      "B": 0,
+      "C": 0.1
+    },
+    "dominantPct": {
+      "copycat": 100
+    },
+    "avgShare": {
+      "copycat": 100
+    },
+    "monoEarlyPct": 100,
+    "avgCoopInteractPct": 90.4,
+    "avgDefectInteractPct": 9.6
+  },
+  "8": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 64.1,
+      "B": 19.5,
+      "C": 16.5
+    },
+    "dominantPct": {
+      "copycat": 70,
+      "generous_copycat": 30
+    },
+    "avgShare": {
+      "copycat": 63.3,
+      "generous_copycat": 36.7
+    },
+    "monoEarlyPct": 13.3,
+    "avgCoopInteractPct": 32.9,
+    "avgDefectInteractPct": 67.1
+  },
+  "9": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 30.6,
+      "B": 33.6,
+      "C": 35.8
+    },
+    "dominantPct": {
+      "cheater": 35.8,
+      "cooperator": 33.6,
+      "detective": 30.6
+    },
+    "avgShare": {
+      "cheater": 39.8,
+      "detective": 31.5,
+      "cooperator": 28.7
+    },
+    "monoEarlyPct": 40.6,
+    "avgCoopInteractPct": 31.9,
+    "avgDefectInteractPct": 68.1
+  },
+  "10": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 55.3,
+      "B": 25.6,
+      "C": 19.2
+    },
+    "dominantPct": {
+      "pavlov": 55.3,
+      "copycat": 25.6,
+      "cheater": 19.2
+    },
+    "avgShare": {
+      "pavlov": 48.4,
+      "copycat": 26.7,
+      "cheater": 24.9
+    },
+    "monoEarlyPct": 45.5,
+    "avgCoopInteractPct": 47.6,
+    "avgDefectInteractPct": 52.4
+  },
+  "11": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 57,
+      "B": 43,
+      "C": 0
+    },
+    "dominantPct": {
+      "sucker": 84.9,
+      "prober": 15.2
+    },
+    "avgShare": {
+      "sucker": 76.3,
+      "prober": 23.7
+    },
+    "monoEarlyPct": 50.9,
+    "avgCoopInteractPct": 68.9,
+    "avgDefectInteractPct": 31.1
+  },
+  "12": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 0,
+      "B": 100,
+      "C": 0
+    },
+    "dominantPct": {
+      "conformist": 100
+    },
+    "avgShare": {
+      "conformist": 95.8,
+      "cheater": 4.2
+    },
+    "monoEarlyPct": 0,
+    "avgCoopInteractPct": 0,
+    "avgDefectInteractPct": 100
+  },
+  "13": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 32.2,
+      "B": 32.2,
+      "C": 35.6
+    },
+    "dominantPct": {
+      "firm_but_fair": 35.2,
+      "grudger": 34.1,
+      "cheater": 30.8
+    },
+    "avgShare": {
+      "firm_but_fair": 35,
+      "grudger": 33.3,
+      "cheater": 31.7
+    },
+    "monoEarlyPct": 3.2,
+    "avgCoopInteractPct": 11,
+    "avgDefectInteractPct": 89
+  },
+  "14": {
+    "trials": 2000,
+    "optionPct": {
+      "A": 23.9,
+      "B": 13.9,
+      "C": 41.6,
+      "tie": 20.8
+    },
+    "dominantPct": {
+      "detective": 50.7,
+      "copycat": 29.6,
+      "cheater": 19.7
+    },
+    "avgShare": {
+      "detective": 43.6,
+      "copycat": 31.7,
+      "cheater": 24.7
+    },
+    "monoEarlyPct": 1.4,
+    "avgCoopInteractPct": 20.8,
+    "avgDefectInteractPct": 79.2
+  }
+}
