@@ -286,6 +286,13 @@
       display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 3;
     }
     .role-ball.size-40 .badge-2 { width: 12px; height: 12px; font-size: 8px; top: -6px; }
+    .role-forgiving { background: #FF9FF3; }
+    .role-forgiving .deco-buffer {
+      position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+      width: 20px; height: 10px; background: #fd79a8; border-radius: 10px 10px 0 0;
+      opacity: 0.85; z-index: 3;
+    }
+    .role-ball.size-40 .deco-buffer { width: 14px; height: 7px; top: -6px; }
     .role-conformist { background: #00B894; }
     .role-conformist .eye-arrow-l {
       position: absolute; left: 22%; top: 38%; width: 0; height: 0;
@@ -355,12 +362,13 @@
     .map-node {
       width: 72px; padding: 0.5rem 0.35rem; border-radius: 10px; text-align: center;
       cursor: pointer; border: 2px solid #555; background: #16213e; font-size: 0.75rem;
+      color: #f5f6fa; text-shadow: 0 1px 2px rgba(0,0,0,0.45);
       transition: transform 0.15s, border-color 0.2s;
     }
     .map-node:hover:not(.locked) { transform: scale(1.05); }
     .map-node.locked { opacity: 0.4; cursor: not-allowed; }
-    .map-node.unlocked { border-color: var(--node-color, var(--accent)); background: transparent; }
-    .map-node.done { background: var(--node-color, var(--accent)); color: #1a1a2e; border-color: var(--node-color); }
+    .map-node.unlocked { border-color: var(--node-color, var(--accent)); background: rgba(255,255,255,0.04); }
+    .map-node.done { background: var(--node-color, var(--accent)); color: var(--node-text-color, #1a1a2e); border-color: var(--node-color); }
     .map-node.done.wrong { background: var(--node-color); opacity: 0.85; }
     .map-node .node-icon { font-size: 1.1rem; display: block; margin-bottom: 2px; }
 
@@ -661,7 +669,7 @@
     </div>
     <aside id="unit-panel">
       <div id="panel-tab">▼ 展开工具栏</div>
-      <div id="panel-title">13 种策略</div>
+      <div id="panel-title">14 种策略</div>
       <div id="palette-list"></div>
     </aside>
   </div>
@@ -735,6 +743,8 @@ const RoleVisuals = {
       persona:'宽容的复读机', logic:'第1轮C；邻居上轮C则C；上轮D则90%D、10%原谅出C。', decos:['halo','deco-heart'] },
     tit_for_two_tats: { id:'tit_for_two_tats', name:'老好人', nameEn:'Tit-for-Two-Tats', color:'#74B9FF', emoji:'😌',
       persona:'宽容两次才反击', logic:'第1轮C；仅当邻居连续两轮对我D时我才D，否则C。', decos:['badge-2'] },
+    forgiving: { id:'forgiving', name:'缓冲者', nameEn:'Forgiving Copycat', color:'#FF9FF3', emoji:'🕊️',
+      persona:'一次背叛，我选择缓冲', logic:'第1轮合作；对方上一轮合作则我合作；对方连续两轮背叛则我背叛；否则（仅背叛一次）我原谅并继续合作。', decos:['deco-buffer'] },
     conformist: { id:'conformist', name:'跟风狗', nameEn:'Conformist', color:'#00B894', emoji:'🐑',
       persona:'随大流', logic:'第1轮C；之后根据左/右邻居上轮对我的动作，D数≥C数则两轮都D，否则都C。', decos:['eye-arrow-l','eye-arrow-r'] },
     firm_but_fair: { id:'firm_but_fair', name:'和事佬', nameEn:'Firm-But-Fair', color:'#E17055', emoji:'🤗',
@@ -830,6 +840,11 @@ const RoleVisuals = {
       b.className = 'badge-2';
       b.textContent = '2';
       ball.appendChild(b);
+    }
+    if (roleId === 'forgiving') {
+      const buf = document.createElement('div');
+      buf.className = 'deco-buffer';
+      ball.appendChild(buf);
     }
     if (roleId === 'conformist') {
       const al = document.createElement('div');
@@ -1066,6 +1081,16 @@ class StrategyLogic {
           if (a === 'D' && b === 'D') return 'D';
         }
         return 'C';
+      case 'forgiving': {
+        if (history.length === 0) return 'C';
+        const last = history[history.length - 1];
+        if (last.oppAction === 'C') return 'C';
+        if (history.length >= 2) {
+          const prev = history[history.length - 2];
+          if (prev.oppAction === 'D') return 'D';
+        }
+        return 'C';
+      }
       case 'firm_but_fair':
         return StrategyLogic.firmButFair(key, history, ctx);
       case 'prober':
@@ -2001,9 +2026,9 @@ class LessonConfig {
     return [
       { title: '序章：小社会的萌芽', ids: [1, 2] },
       { title: '第一章：善良与脆弱', ids: [3, 4, 5] },
-      { title: '第二章：互惠的演化', ids: [6, 7, 8] },
-      { title: '第三章：高级策略', ids: [9, 10, 11] },
-      { title: '第四章：空间与结构', ids: [12, 13, 14] }
+      { title: '第二章：互惠的演化', ids: [6, 7, 8, 9] },
+      { title: '第三章：高级策略', ids: [10, 11, 12] },
+      { title: '第四章：空间与结构', ids: [13, 14, 15] }
     ];
   }
 
@@ -2056,15 +2081,23 @@ class LessonConfig {
       options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'沙匪',roleRef:'cheater',isCorrect:false},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
       revealTitle:'结局：驼铃压过沙匪的口哨', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮起左右都是竖起的箭垛。镜子人彼此合作得分更稳，沙匪要么在报复中得分归零，要么倒在随机沉船后把营地让给邻居。50 轮后你再看：镜子人的驼队占了大半休息圈，沙匪只剩零星几支还在苟延——报复没有消灭他们，却让合作成了主流。',
       revealTheory:'当背叛会招致报复时，背叛就不再划算。减少无意义的沉船、让互助者有机会接盘，镜子人就能在演化中占优。报复能力不是暴力，而是让「合作」成为理性选择的信用背书。' },
-    { id:7, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0, targetRounds:38, editable:false,
-      storyBg:['10 个镜子人围坐在「诚信酒馆」，发誓以牙还牙。地板年久失修，每轮约 5% 概率「手滑」——动作被记成背叛，却没有道歉机制。','你是角落里弹琵琶的乐师。你担心噪声会引爆仇恨链；可多数时候，人们仍在互相敬酒——只是偶尔一角会陷入报复循环。'],
+    { id:7, name:'减震器', themeColor:'#FF9FF3', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0, targetRounds:30, editable:false,
+      storyBg:['10 个工匠围坐工坊，5 个是「镜子人」（复读机），5 个是「缓冲者」。地板年久失修，每轮有 5% 概率手滑——酒杯「意外」泼到邻居脸上。镜子人的铁律是：你泼我一次，我下一轮必泼回去。缓冲者的规矩是：第一次手滑，我当作意外；连续两次泼我，我才认定你是故意的。','你是工坊的管事，站在中央观察。同样的噪声环境，零容忍与一次容错的差别，会在多轮后显现。'],
+      cast:[{role:'copycat',storyName:'镜子人',count:5},{role:'forgiving',storyName:'缓冲者',count:5}],
+      preplaced:[{role:'copycat',count:5,positions:[0,2,4,6,8]},{role:'forgiving',count:5,positions:[1,3,5,7,9]}],
+      question:'30 轮后，哪种工匠在工坊里占多数？',
+      options:[{id:'A',label:'镜子人（复读机）',roleRef:'copycat',isCorrect:false},{id:'B',label:'缓冲者',roleRef:'forgiving',isCorrect:true},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：容错让合作在噪声中存活', revealStory:'第 3 轮，2 号镜子人手滑泼了 3 号镜子人。第 4 轮，3 号报复；第 5 轮，2 号看到报复也报复……死锁像裂痕一样在镜子人之间蔓延。而缓冲者们呢？5 号手滑泼了 6 号缓冲者，6 号选择原谅；下一轮 5 号恢复正常合作，6 号也继续合作——裂痕被一次缓冲吸收了。30 轮后，缓冲者的席位越来越多，镜子人则在互相报复中逐渐凋零。',
+      revealTheory:'零容忍在纯净环境中是美德，在噪声环境中是自杀。允许一次背叛的缓冲机制，不是软弱，而是给「意外」一个撤销按钮。现实世界里没有绝对的精确沟通，容错是互惠策略的必备补丁。' },
+    { id:8, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0, targetRounds:38, editable:false,
+      storyBg:['上一课你已见过：一次容错能救合作。现在走进「诚信酒馆」——10 个镜子人，全是零容忍的以牙还牙。地板年久失修，每轮约 5% 手滑，没有道歉机制，只有行动记录。','你是角落里弹琵琶的乐师。当所有人都是镜子人时，一次「意外背叛」会不会点燃整条仇恨链？'],
       cast:[{role:'copycat',storyName:'镜子人',count:10}],
       preplaced:[{role:'copycat',count:10,positions:'all'}],
       question:'38 轮后，这群人还能合作吗？主流状态是？',
-      options:[{id:'A',label:'继续合作',roleRef:null,isCorrect:true},{id:'B',label:'互相背叛/仇恨螺旋',roleRef:'copycat',isCorrect:false},{id:'C',label:'一半一半',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：合作表象仍在，裂痕在暗处', revealStory:'手滑每天都在发生，你也听见几声惊呼、几次报复。但 38 轮后，圆环上仍是镜子人占满席位，多数邻接互动仍是双方合作——只有局部曾闪过仇恨链。噪声没有立刻把酒馆变成修罗场，却让每一次「误会」都像埋在地板下的火药。',
-      revealTheory:'5% 手滑在纯互惠群体里，往往被「继续互惠」吸收，终局仍可能以合作为主。这不代表噪声无害——它随时可能在某一角点燃链式报复。没有宽容机制时，合作很脆，只是未必一夜崩塌。' },
-    { id:8, name:'灭火器', themeColor:'#FDCB6E', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0.05, targetRounds:38, editable:false,
+      options:[{id:'A',label:'继续合作',roleRef:null,isCorrect:false},{id:'B',label:'互相背叛/仇恨螺旋',roleRef:'copycat',isCorrect:true},{id:'C',label:'一半一半',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：全是镜子人，走在玻璃刀锋上', revealStory:'第 3 轮，靠门的镜子人滑倒了。第 4 轮，他的邻居报复；第 5 轮，裂痕在局部蔓延……可酒馆里仍是十个镜子人，多数时候酒杯还是碰在一起。38 轮后，席位清一色是镜子人——表面合作还在，却没有一个人愿意给「手滑」留缓冲。每一次误伤都像埋在地板下的火药：未必立刻炸毁酒馆，却让你再也喝不下一口安稳的酒。',
+      revealTheory:'全员零容忍的互惠，在噪声里未必一夜崩盘，却会把系统锁死在「表面合作、局部报复」的脆弱态。对比第 7 课：多一个确定性缓冲者，就能把意外从仇恨链里摘出去。' },
+    { id:9, name:'灭火器', themeColor:'#FDCB6E', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0.05, targetRounds:38, editable:false,
       storyBg:['诚信酒馆地板年久失修（5% 手滑），灯光昏暗（5% 误解）。7 个镜子人 + 3 个宽宏者混住在「宽宏客栈」。宽宏者愿意原谅「你真的背叛了我」，也愿意原谅「我以为你背叛了你」。','你是两家酒馆的房东，手持钥匙站在中间。噪声会点燃仇恨链，但谁能占满更多空位，还要看适应度竞争——人数多的镜子人，未必输给更宽容的人。'],
       cast:[{role:'copycat',storyName:'镜子人',count:7},{role:'generous_copycat',storyName:'宽宏者',count:3}],
       preplaced:[{role:'copycat',count:7,positions:[0,1,2,3,4,5,6]},{role:'generous_copycat',count:3,positions:[7,8,9]}],
@@ -2072,7 +2105,7 @@ class LessonConfig {
       options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'宽宏者',roleRef:'generous_copycat',isCorrect:false},{id:'C',label:'谁也阻止不了',roleRef:null,isCorrect:false}],
       revealTitle:'结局：宽宏者没能守住客栈', revealStory:'误解与手滑把诚信酒馆变成了仇杀酒馆，搬到隔壁的宽宏者本想灭火，却人少势孤。镜子人彼此报复时得分起伏大，空位竞争里往往是抱团、得分更稳的镜子人后裔占满营地。38 轮后，宽宏客栈只剩零星几盏灯，圆环上绝大多数仍是镜子人——他们会原谅，也会记仇，但繁殖的速度更快。',
       revealTheory:'偶尔原谅能打断仇恨链，却不保证在演化中胜出。当互惠者数量占优、又遭遇噪声时，「更会复制」的镜子人往往压过「更愿原谅」的宽宏者。宽容是稳定阀，不是必胜保证。' },
-    { id:9, name:'侦探事务所', themeColor:'#FF7675', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
+    { id:10, name:'侦探事务所', themeColor:'#FF7675', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
       storyBg:['维多利亚风格的 12 人圆桌侦探俱乐部。4 个「侦探」戴猎鹿帽，4 个「老实人」（合作者）捧茶杯，4 个「惯犯」（骗子）藏在阴影里。侦探前 4 轮是试用期：合作-背叛-合作-合作；4 轮后，若曾被背叛则变镜子人，若从未被背叛则变骗子。','你是俱乐部主席，手持怀表计时。侦探们像变色龙一样分化——面对老实人他们变黑，面对惯犯他们变白。'],
       cast:[{role:'detective',storyName:'侦探',count:4},{role:'cooperator',storyName:'老实人',count:4},{role:'cheater',storyName:'惯犯',count:4}],
       preplaced:[{role:'detective',count:4,positions:[0,3,6,9]},{role:'cooperator',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
@@ -2080,7 +2113,7 @@ class LessonConfig {
       options:[{id:'A',label:'侦探',roleRef:'detective',isCorrect:false},{id:'B',label:'老实人',roleRef:'cooperator',isCorrect:false},{id:'C',label:'惯犯',roleRef:'cheater',isCorrect:true}],
       revealTitle:'结局：惯犯在混局中坐大', revealStory:'侦探的试用期很精彩：对老实人变骗子，对惯犯变复读机。但死亡-出生拼的是近期适应度，惯犯每轮榨取更狠，空位竞争里黑影扩张最快。老实人最先大量出局，侦探席位被蚕食。50 轮后，圆桌边上惯犯最多——他们未必最聪明，却最会占便宜。',
       revealTheory:'适应性策略能短期分化，却不保证长期占座。在混合博弈里，单纯背叛者若持续拿到高分，仍可能在繁殖竞争中压制「先试探再变形」的侦探。信息优势要转化为繁殖优势，才算演化成功。' },
-    { id:10, name:'变色龙', themeColor:'#A29BFE', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
+    { id:11, name:'变色龙', themeColor:'#A29BFE', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
       storyBg:['热带雨林，12 只动物围水潭而居。4 只「变色龙」（墙头草）只看输赢调整肤色；4 只「镜子鸟」（复读机）以牙还牙；4 只「毒蛇」（骗子）永远偷袭。雨季食物匮乏，每轮必须选择与左邻或右邻共享或抢夺领地。','你是蹲在树上的博物学家，手持望远镜。镜子鸟与毒蛇陷入死斗，变色龙却根据上一轮的得分随时切换阵营。'],
       cast:[{role:'pavlov',storyName:'变色龙',count:4},{role:'copycat',storyName:'镜子鸟',count:4},{role:'cheater',storyName:'毒蛇',count:4}],
       preplaced:[{role:'pavlov',count:4,positions:[0,3,6,9]},{role:'copycat',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
@@ -2088,7 +2121,7 @@ class LessonConfig {
       options:[{id:'A',label:'变色龙',roleRef:'pavlov',isCorrect:true},{id:'B',label:'镜子鸟',roleRef:'copycat',isCorrect:false},{id:'C',label:'毒蛇',roleRef:'cheater',isCorrect:false}],
       revealTitle:'结局：变色龙在混战中占先', revealStory:'镜子鸟与毒蛇互相消耗，变色龙却凭「赢则固守、输则改变」稳住近期权重。空位竞争里，墙头草后裔最常接盘。50 轮后，水潭边三种颜色都在，但变色龙的鳞片最多——灵活在三方胶着中成了繁殖优势。',
       revealTheory:'「赢存输变」在长期混战中，往往比死斗的互惠或纯背叛更能稳住权重曲线。单轮高分不等于演化胜利；会随局势调策略的一方，更能在沉船后占据空位。' },
-    { id:11, name:'猎手与猎物', themeColor:'#636E72', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
+    { id:12, name:'猎手与猎物', themeColor:'#636E72', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['北方雪原，12 个帐篷围成猎营。3 个「猎手」（试探者）骑着黑狼，其余 9 个是「肥羊」（傻子），只会低头吃草。猎手第 1 轮必定偷袭试探；若肥羊不反击，则判定为猎物，永久压榨；若反击，则切换为镜子模式。','你是营火旁的萨满，能听懂狼语。猎手们像手术刀一样精准识别软柿子，对硬茬子则立刻装成盟友。'],
       cast:[{role:'prober',storyName:'猎手',count:3},{role:'sucker',storyName:'肥羊',count:9}],
       preplaced:[{role:'prober',count:3,positions:[0,4,8]},{role:'sucker',count:9,positions:'remaining'}],
@@ -2096,7 +2129,7 @@ class LessonConfig {
       options:[{id:'A',label:'被肥羊的善良感化',roleRef:null,isCorrect:false},{id:'B',label:'识别软柿子并统治群体',roleRef:'prober',isCorrect:true},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
       revealTitle:'结局：狼少，却钉在账本上', revealStory:'猎手第 1 轮试探，肥羊不反击就被永久压榨。38 轮后，肥羊帐篷仍占多数席位——傻子换了一茬又一茬；可那 3 顶狼帐往往还在，权重在剥削里居高不下。猎手统治的不是人口，而是「谁接盘」：多数格子是羊，规则却由狼写。',
       revealTheory:'试探者不必在人数上取胜。只要 3 个猎手长期存活、权重压过邻居，空位就会按他们的策略复制——肥羊可以很多，却难以改写猎营秩序。' },
-    { id:12, name:'瘟疫', themeColor:'#00B894', playerCount:24, radiusHint:280, immortalIndices:[0], actionNoise:0,perceptionNoise:0, targetRounds:25, editable:false,
+    { id:13, name:'瘟疫', themeColor:'#00B894', playerCount:24, radiusHint:280, immortalIndices:[0], actionNoise:0,perceptionNoise:0, targetRounds:25, editable:false,
       storyBg:['南方盲从部落，24 个帐篷围成圣圈。23 个「盲从者」（跟风狗）没有主见，只看左右邻居上一轮做什么，自己就跟着做。1 个「零号病人」（骗子）在祭坛边打了个喷嚏——他第 1 轮就选择了背叛。盲从者们以为零号病人在执行某种新仪式。','你是部落外的游医，被挡在圣圈外观察。零号病人背叛后，左右两个盲从者下一轮也背叛；这两个盲从者又影响各自的另一个邻居……'],
       cast:[{role:'cheater',storyName:'零号病人',count:1},{role:'conformist',storyName:'盲从者',count:23}],
       preplaced:[{role:'cheater',count:1,positions:[0]},{role:'conformist',count:23,positions:'remaining'}],
@@ -2104,7 +2137,7 @@ class LessonConfig {
       options:[{id:'A',label:'合作互助',roleRef:null,isCorrect:false},{id:'B',label:'互相欺骗/背叛',roleRef:'conformist',isCorrect:true},{id:'C',label:'保持混乱',roleRef:null,isCorrect:false}],
       revealTitle:'结局：背叛之火燃遍圣圈', revealStory:'第 1 轮，零号病人背叛了。第 2 轮，他的两个邻居跟着背叛。第 3 轮，4 个帐篷挂起了黑旗……你看着背叛像瘟疫一样沿着圣圈蔓延，25 轮后，24 个帐篷全部燃起了背叛之火。零号病人站在祭坛上大笑——他从未被治愈，因为他就是瘟疫本身。',
       revealTheory:'没有主见的人，是病毒最好的宿主。空间结构会放大微小扰动——一个骗子就能通过盲从者毁灭整个群体。' },
-    { id:13, name:'调解员', themeColor:'#E17055', playerCount:24, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
+    { id:14, name:'调解员', themeColor:'#E17055', playerCount:24, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['西部荒野，24 个矿坑围成决斗场。8 个「死仇者」（记仇者）与 8 个「强盗」（骗子）世代血仇，中间夹着 8 个「调解员」（和事佬）。死仇者被骗一次就终身追杀；调解员被骗后只报复一轮，然后原谅。','你是酒馆老板娘，给三方卖酒，冷眼旁观。死仇者与强盗陷入无限死循环，调解员试图在中间「只打一拳就握手」。'],
       cast:[{role:'grudger',storyName:'死仇者',count:8},{role:'cheater',storyName:'强盗',count:8},{role:'firm_but_fair',storyName:'调解员',count:8}],
       preplaced:[{role:'grudger',count:8,positions:'everyThird'},{role:'cheater',count:8,positions:'everyThirdOffset1'},{role:'firm_but_fair',count:8,positions:'everyThirdOffset2'}],
@@ -2112,7 +2145,7 @@ class LessonConfig {
       options:[{id:'A',label:'能，仇恨被平息',roleRef:'firm_but_fair',isCorrect:false},{id:'B',label:'不能，调解员被双方消灭',roleRef:null,isCorrect:false},{id:'C',label:'三方继续混战',roleRef:null,isCorrect:true}],
       revealTitle:'结局：酒馆还在，仇却未消', revealStory:'调解员确实只回一枪就递威士忌，但死仇者与强盗的世仇太深，三方在沉船与繁殖中此消彼长，谁也吃不了整桌席。38 轮后，矿坑边仍是三种旗帜交错：调解员没有绝迹，却也没能让血仇熄火——僵局本身就是答案。',
       revealTheory:'有限报复能缓解一对矛盾，却无法在多方混战中自动胜出。当记仇者与骗子数量相当，和事佬往往只能维持胶着，而非一家独大。调解是手术刀，不是万能和平协议。' },
-    { id:14, name:'终局', themeColor:'#dfe6e9', playerCount:36, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, anyAnswerCorrect:true, editable:false,
+    { id:15, name:'终局', themeColor:'#dfe6e9', playerCount:36, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, anyAnswerCorrect:true, editable:false,
       storyBg:['帝国议会，36 个席位围成圆桌。12 个「镜子议员」（复读机）、12 个「阴谋家」（骗子）、12 个「侦探大臣」三方割据。没有皇帝，只有永恒的博弈。','你是史官，手持毛笔记录这一切。三方在前线僵持，没有任何一方能彻底消灭另一方。'],
       cast:[{role:'copycat',storyName:'镜子议员',count:12},{role:'cheater',storyName:'阴谋家',count:12},{role:'detective',storyName:'侦探大臣',count:12}],
       preplaced:[{role:'copycat',count:12,positions:'everyThird'},{role:'cheater',count:12,positions:'everyThirdOffset1'},{role:'detective',count:12,positions:'everyThirdOffset2'}],
@@ -2128,7 +2161,7 @@ class ClassroomProgress {
     try {
       const d = JSON.parse(localStorage.getItem(CLASSROOM_PROGRESS_KEY));
       const data = d || { unlocked: 1, lessons: {} };
-      if (data.unlocked > 14) data.unlocked = 14;
+      if (data.unlocked > 15) data.unlocked = 15;
       return data;
     } catch { return { unlocked: 1, lessons: {} }; }
   }
@@ -2137,7 +2170,7 @@ class ClassroomProgress {
   static markComplete(id, wrong) {
     const d = ClassroomProgress.load();
     d.lessons[id] = { done: true, wrong: !!wrong };
-    if (id >= d.unlocked && id < 14) d.unlocked = id + 1;
+    if (id >= d.unlocked && id < 15) d.unlocked = id + 1;
     ClassroomProgress.save(d);
   }
   static getLessonState(id) { return ClassroomProgress.load().lessons[id] || null; }
@@ -2349,6 +2382,22 @@ class ClassroomMap {
     this.refs = refs;
     this.app = app;
   }
+
+  // done 节点使用主题色做底色；需根据明度自动选文字色避免“黑块/黑字”对比不足
+  static pickContrastingText(hex) {
+    if (!hex || typeof hex !== 'string') return '#fff';
+    let c = hex.trim().replace('#', '');
+    if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+    if (c.length !== 6) return '#fff';
+    const r = parseInt(c.slice(0, 2), 16);
+    const g = parseInt(c.slice(2, 4), 16);
+    const b = parseInt(c.slice(4, 6), 16);
+    // 相对亮度（sRGB）
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    // 明亮底色用深字；深色底色用白字
+    return luminance > 0.62 ? '#1a1a2e' : '#fff';
+  }
+
   render() {
     const root = document.getElementById('classroom-map-chapters');
     root.innerHTML = '';
@@ -2368,6 +2417,7 @@ class ClassroomMap {
         node.type = 'button';
         node.className = 'map-node';
         node.style.setProperty('--node-color', lesson.themeColor);
+        node.style.setProperty('--node-text-color', ClassroomMap.pickContrastingText(lesson.themeColor));
         if (!unlocked) { node.classList.add('locked'); node.innerHTML = `<span class="node-icon">🔒</span>第${id}课`; }
         else {
           node.classList.add('unlocked');
@@ -2568,11 +2618,11 @@ class StorySequence {
 }
 
 /** 2000 次蒙特卡洛，规则与游戏一致（死亡 1/6、近5轮权重、激进繁殖胜率、新生儿均分继承）。由 simulate-lessons.mjs 生成 */
-const LESSON_SIM_STATS = {"1":{"trials":2000,"optionPct":{"A":0.6,"B":98.4,"C":1.1},"dominantPct":{"cheater":99.2,"cooperator":0.9},"avgShare":{"cheater":98.6,"cooperator":1.4},"monoEarlyPct":95.9,"avgCoopInteractPct":0.7,"avgDefectInteractPct":99.3},"2":{"trials":2000,"optionPct":{"A":60.1,"B":32.3,"C":7.6},"dominantPct":{"copycat":64.5,"cheater":35.6},"avgShare":{"copycat":62.5,"cheater":37.5},"monoEarlyPct":73.8,"avgCoopInteractPct":11,"avgDefectInteractPct":89},"3":{"trials":2000,"optionPct":{"A":81.3,"B":6.3,"C":12.4},"dominantPct":{"cooperator":85.4,"cheater":14.7},"avgShare":{"cooperator":67.2,"cheater":32.8},"monoEarlyPct":0.6,"avgCoopInteractPct":55.1,"avgDefectInteractPct":44.9},"4":{"trials":2000,"optionPct":{"A":41,"B":2.2,"C":56.9},"dominantPct":{"copycat":48.9,"cooperator":48.2,"cheater":3},"avgShare":{"copycat":51.9,"cooperator":42.5,"cheater":5.6},"monoEarlyPct":35.1,"avgCoopInteractPct":79.1,"avgDefectInteractPct":20.9},"5":{"trials":2000,"optionPct":{"A":37.6,"B":53.5,"C":9},"dominantPct":{"cheater":57.4,"sucker":42.6},"avgShare":{"cheater":61,"sucker":39},"monoEarlyPct":53.5,"avgCoopInteractPct":29.7,"avgDefectInteractPct":70.3},"6":{"trials":2000,"optionPct":{"A":97.6,"B":0.7,"C":1.8},"dominantPct":{"copycat":99,"cheater":1.1},"avgShare":{"copycat":93.7,"cheater":6.3},"monoEarlyPct":78.5,"avgCoopInteractPct":52.2,"avgDefectInteractPct":47.8},"7":{"trials":2000,"optionPct":{"A":99.9,"B":0,"C":0.1},"dominantPct":{"copycat":100},"avgShare":{"copycat":100},"monoEarlyPct":100,"avgCoopInteractPct":90.3,"avgDefectInteractPct":9.7},"8":{"trials":2000,"optionPct":{"A":61.7,"B":20.9,"C":17.4},"dominantPct":{"copycat":68.3,"generous_copycat":31.7},"avgShare":{"copycat":62.8,"generous_copycat":37.2},"monoEarlyPct":13.7,"avgCoopInteractPct":33,"avgDefectInteractPct":67},"9":{"trials":2000,"optionPct":{"A":30.2,"B":34.2,"C":35.7},"dominantPct":{"cheater":35.7,"cooperator":34.2,"detective":30.2},"avgShare":{"cheater":39.6,"detective":30.5,"cooperator":29.9},"monoEarlyPct":37.7,"avgCoopInteractPct":32.6,"avgDefectInteractPct":67.4},"10":{"trials":2000,"optionPct":{"A":52.4,"B":26.7,"C":21},"dominantPct":{"pavlov":52.4,"copycat":26.7,"cheater":21},"avgShare":{"pavlov":46.3,"copycat":28,"cheater":25.7},"monoEarlyPct":44.4,"avgCoopInteractPct":46.5,"avgDefectInteractPct":53.5},"11":{"trials":2000,"optionPct":{"A":59.2,"B":40.8,"C":0},"dominantPct":{"sucker":85.3,"prober":14.7},"avgShare":{"sucker":77.8,"prober":22.2},"monoEarlyPct":51.9,"avgCoopInteractPct":70,"avgDefectInteractPct":30},"12":{"trials":2000,"optionPct":{"A":0,"B":100,"C":0},"dominantPct":{"conformist":100},"avgShare":{"conformist":95.8,"cheater":4.2},"monoEarlyPct":0,"avgCoopInteractPct":0,"avgDefectInteractPct":100},"13":{"trials":2000,"optionPct":{"A":33.2,"B":32.8,"C":34.1},"dominantPct":{"firm_but_fair":36.1,"grudger":33,"cheater":30.9},"avgShare":{"firm_but_fair":34.8,"grudger":33.2,"cheater":31.9},"monoEarlyPct":2.7,"avgCoopInteractPct":10.6,"avgDefectInteractPct":89.4},"14":{"trials":2000,"optionPct":{"A":24.4,"B":12.4,"C":40.6,"tie":22.7},"dominantPct":{"detective":50.8,"copycat":30.8,"cheater":18.4},"avgShare":{"detective":43.3,"copycat":31.5,"cheater":25.2},"monoEarlyPct":1.1,"avgCoopInteractPct":20.7,"avgDefectInteractPct":79.3}};
+const LESSON_SIM_STATS = {"1":{"trials":2000,"optionPct":{"A":0.4,"B":98.3,"C":1.4},"dominantPct":{"cheater":99.2,"cooperator":0.8},"avgShare":{"cheater":98.5,"cooperator":1.5},"monoEarlyPct":95.2,"avgCoopInteractPct":0.6,"avgDefectInteractPct":99.4},"2":{"trials":2000,"optionPct":{"A":56.3,"B":37,"C":6.8},"dominantPct":{"copycat":60.1,"cheater":40},"avgShare":{"copycat":59.1,"cheater":40.9},"monoEarlyPct":72.9,"avgCoopInteractPct":10.2,"avgDefectInteractPct":89.8},"3":{"trials":2000,"optionPct":{"A":81.6,"B":6.7,"C":11.8},"dominantPct":{"cooperator":87.2,"cheater":12.8},"avgShare":{"cooperator":67,"cheater":33},"monoEarlyPct":0.4,"avgCoopInteractPct":54.6,"avgDefectInteractPct":45.4},"4":{"trials":2000,"optionPct":{"A":41.6,"B":2.3,"C":56.2},"dominantPct":{"copycat":49.1,"cooperator":47.9,"cheater":3.1},"avgShare":{"copycat":51.8,"cooperator":42,"cheater":6.3},"monoEarlyPct":34.2,"avgCoopInteractPct":78.8,"avgDefectInteractPct":21.2},"5":{"trials":2000,"optionPct":{"A":39.7,"B":51.3,"C":9.1},"dominantPct":{"cheater":54.8,"sucker":45.2},"avgShare":{"cheater":59.5,"sucker":40.5},"monoEarlyPct":53.5,"avgCoopInteractPct":30.8,"avgDefectInteractPct":69.2},"6":{"trials":2000,"optionPct":{"A":97.8,"B":0.5,"C":1.8},"dominantPct":{"copycat":99.4,"cheater":0.6},"avgShare":{"copycat":93.8,"cheater":6.2},"monoEarlyPct":78.4,"avgCoopInteractPct":51.9,"avgDefectInteractPct":48.1},"7":{"trials":2000,"optionPct":{"A":43.5,"B":56.6,"C":0},"dominantPct":{"forgiving":56.6,"copycat":43.5},"avgShare":{"forgiving":53.6,"copycat":46.4},"monoEarlyPct":22.5,"avgCoopInteractPct":68.6,"avgDefectInteractPct":31.4},"8":{"trials":2000,"optionPct":{"A":0,"B":100,"C":0},"dominantPct":{"copycat":100},"avgShare":{"copycat":100},"monoEarlyPct":100,"avgCoopInteractPct":90.4,"avgDefectInteractPct":9.6},"9":{"trials":2000,"optionPct":{"A":62.2,"B":20.9,"C":16.9},"dominantPct":{"copycat":68.1,"generous_copycat":31.9},"avgShare":{"copycat":63,"generous_copycat":37},"monoEarlyPct":15.5,"avgCoopInteractPct":32.8,"avgDefectInteractPct":67.2},"10":{"trials":2000,"optionPct":{"A":29.4,"B":32.7,"C":38},"dominantPct":{"cheater":38,"cooperator":32.7,"detective":29.4},"avgShare":{"cheater":41.4,"detective":29.9,"cooperator":28.8},"monoEarlyPct":39.5,"avgCoopInteractPct":31.7,"avgDefectInteractPct":68.3},"11":{"trials":2000,"optionPct":{"A":52.1,"B":26.9,"C":21.1},"dominantPct":{"pavlov":52.1,"copycat":26.9,"cheater":21.1},"avgShare":{"pavlov":45.7,"copycat":28.3,"cheater":26},"monoEarlyPct":44.5,"avgCoopInteractPct":46.1,"avgDefectInteractPct":53.9},"12":{"trials":2000,"optionPct":{"A":61.2,"B":38.8,"C":0},"dominantPct":{"sucker":86,"prober":14.1},"avgShare":{"sucker":78.4,"prober":21.6},"monoEarlyPct":52.8,"avgCoopInteractPct":70.4,"avgDefectInteractPct":29.6},"13":{"trials":2000,"optionPct":{"A":0,"B":100,"C":0},"dominantPct":{"conformist":100},"avgShare":{"conformist":95.8,"cheater":4.2},"monoEarlyPct":0,"avgCoopInteractPct":0,"avgDefectInteractPct":100},"14":{"trials":2000,"optionPct":{"A":33.9,"B":32.9,"C":33.2},"dominantPct":{"firm_but_fair":36.8,"grudger":34.5,"cheater":28.8},"avgShare":{"firm_but_fair":35,"grudger":34.2,"cheater":30.9},"monoEarlyPct":2.7,"avgCoopInteractPct":11,"avgDefectInteractPct":89},"15":{"trials":2000,"optionPct":{"A":22.6,"B":14.4,"C":43,"tie":20.1},"dominantPct":{"detective":51.4,"copycat":28,"cheater":20.7},"avgShare":{"detective":44.4,"copycat":30.2,"cheater":25.4},"monoEarlyPct":1.1,"avgCoopInteractPct":20.5,"avgDefectInteractPct":79.5}};
 
 const SIM_ROLE_LABELS = {
   cooperator:'合作者', cheater:'骗子', copycat:'复读机', sucker:'冤大头', grudger:'记仇者',
-  detective:'侦探', pavlov:'墙头草', generous_copycat:'宽宏复读机', conformist:'跟风者',
+  detective:'侦探', pavlov:'墙头草', generous_copycat:'宽宏复读机', forgiving:'缓冲者', conformist:'跟风者',
   firm_but_fair:'和事佬', prober:'试探者'
 };
 
@@ -2590,7 +2640,7 @@ class LessonSimStats {
     lines.push(`终局场上平均席位：${shareParts.join(' · ')}`);
     lines.push(`终局一轮邻接互动：双方合作约 ${s.avgCoopInteractPct}% · 至少一方背叛约 ${s.avgDefectInteractPct}%`);
     if (s.monoEarlyPct >= 15) lines.push(`未满目标回合即单一策略统治：约 ${s.monoEarlyPct}%`);
-    if (lesson.id === 14 && s.optionPct.tie != null)
+    if (lesson.id === 15 && s.optionPct.tie != null)
       lines.push(`终局三方人数差距≤3（胶着）：约 ${s.optionPct.tie}%`);
     const correct = lesson.options.find(o => o.isCorrect);
     if (correct && !lesson.anyAnswerCorrect && (s.optionPct[correct.id] ?? 0) < 40)
@@ -2639,7 +2689,7 @@ class RevealModal {
     }
     ClassroomProgress.markComplete(lesson.id, !isCorrect && !lesson.anyAnswerCorrect);
     const nextBtn = document.getElementById('btn-reveal-next');
-    if (lesson.id < 14) {
+    if (lesson.id < 15) {
       nextBtn.style.display = 'inline-block';
       const nextId = lesson.id + 1;
       const canNext = ClassroomProgress.isUnlocked(nextId);
@@ -2920,7 +2970,7 @@ class ClassroomGameController {
     AudioManager.get().stopBGM();
     if (this._evolveHandler) this.refs.btnEvolve.removeEventListener('click', this._evolveHandler);
     this.refs.screenGame.classList.remove('classroom-mode');
-    this.refs.unitPanel.querySelector('#panel-title').textContent = '13 种策略';
+    this.refs.unitPanel.querySelector('#panel-title').textContent = '14 种策略';
     this.refs.btnEvolve.textContent = '▶ 演变';
     this.refs.btnEvolve.classList.remove('reveal-ready');
     document.getElementById('classroom-auto').checked = false;

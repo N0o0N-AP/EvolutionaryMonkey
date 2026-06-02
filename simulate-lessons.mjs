@@ -124,6 +124,16 @@ function decide(role, neighborId, history, round, grudgeCtx, playerIndex) {
         if (a === 'D' && b === 'D') return 'D';
       }
       return 'C';
+    case 'forgiving': {
+      if (history.length === 0) return 'C';
+      const last = history[history.length - 1];
+      if (last.oppAction === 'C') return 'C';
+      if (history.length >= 2) {
+        const prev = history[history.length - 2];
+        if (prev.oppAction === 'D') return 'D';
+      }
+      return 'C';
+    }
     case 'firm_but_fair': {
       let g = grudgeCtx.get(key) || 0;
       if (g > 0) { grudgeCtx.set(key, g - 1); return 'D'; }
@@ -344,28 +354,31 @@ const lessons = [
   { id:6, playerCount:12, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'copycat',count:8,positions:[0,1,2,3,4,5,10,11]},{role:'cheater',count:4,positions:[6,7,8,9]}],
     options:[{id:'A',label:'镜子人'},{id:'B',label:'沙匪'},{id:'C',label:'同归于尽'}] },
-  { id:7, playerCount:10, targetRounds:38, immortalIndices:[], actionNoise:0.05, perceptionNoise:0,
+  { id:7, playerCount:10, targetRounds:30, immortalIndices:[], actionNoise:0.05, perceptionNoise:0,
+    preplaced:[{role:'copycat',count:5,positions:[0,2,4,6,8]},{role:'forgiving',count:5,positions:[1,3,5,7,9]}],
+    options:[{id:'A',label:'镜子人'},{id:'B',label:'缓冲者'},{id:'C',label:'同归于尽'}] },
+  { id:8, playerCount:10, targetRounds:38, immortalIndices:[], actionNoise:0.05, perceptionNoise:0,
     preplaced:[{role:'copycat',count:10,positions:'all'}],
     options:[{id:'A',label:'继续合作'},{id:'B',label:'仇恨螺旋'},{id:'C',label:'一半一半'}] },
-  { id:8, playerCount:10, targetRounds:38, immortalIndices:[], actionNoise:0.05, perceptionNoise:0.05,
+  { id:9, playerCount:10, targetRounds:38, immortalIndices:[], actionNoise:0.05, perceptionNoise:0.05,
     preplaced:[{role:'copycat',count:7,positions:[0,1,2,3,4,5,6]},{role:'generous_copycat',count:3,positions:[7,8,9]}],
     options:[{id:'A',label:'镜子人'},{id:'B',label:'宽宏者'},{id:'C',label:'谁也阻止不了'}] },
-  { id:9, playerCount:12, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
+  { id:10, playerCount:12, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'detective',count:4,positions:[0,3,6,9]},{role:'cooperator',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
     options:[{id:'A',label:'侦探'},{id:'B',label:'老实人'},{id:'C',label:'惯犯'}] },
-  { id:10, playerCount:12, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
+  { id:11, playerCount:12, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'pavlov',count:4,positions:[0,3,6,9]},{role:'copycat',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
     options:[{id:'A',label:'变色龙'},{id:'B',label:'镜子鸟'},{id:'C',label:'毒蛇'}] },
-  { id:11, playerCount:12, targetRounds:38, immortalIndices:[], actionNoise:0, perceptionNoise:0,
+  { id:12, playerCount:12, targetRounds:38, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'prober',count:3,positions:[0,4,8]},{role:'sucker',count:9,positions:'remaining'}],
     options:[{id:'A',label:'被感化'},{id:'B',label:'猎手统治'},{id:'C',label:'同归于尽'}] },
-  { id:12, playerCount:24, targetRounds:25, immortalIndices:[0], actionNoise:0, perceptionNoise:0,
+  { id:13, playerCount:24, targetRounds:25, immortalIndices:[0], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'cheater',count:1,positions:[0]},{role:'conformist',count:23,positions:'remaining'}],
     options:[{id:'A',label:'合作互助'},{id:'B',label:'背叛蔓延'},{id:'C',label:'保持混乱'}] },
-  { id:13, playerCount:24, targetRounds:38, immortalIndices:[], actionNoise:0, perceptionNoise:0,
+  { id:14, playerCount:24, targetRounds:38, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'grudger',count:8,positions:'everyThird'},{role:'cheater',count:8,positions:'everyThirdOffset1'},{role:'firm_but_fair',count:8,positions:'everyThirdOffset2'}],
     options:[{id:'A',label:'调解成功'},{id:'B',label:'调解失败'},{id:'C',label:'三方混战'}] },
-  { id:14, playerCount:36, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
+  { id:15, playerCount:36, targetRounds:50, immortalIndices:[], actionNoise:0, perceptionNoise:0,
     preplaced:[{role:'copycat',count:12,positions:'everyThird'},{role:'cheater',count:12,positions:'everyThirdOffset1'},{role:'detective',count:12,positions:'everyThirdOffset2'}],
     options:[{id:'A',label:'互惠派'},{id:'B',label:'背叛派'},{id:'C',label:'信息派'}] },
 ];
@@ -379,17 +392,23 @@ function pickWinner(lesson, result) {
     return s > ch ? 'A' : 'B';
   }
   if (lesson.id === 7) {
+    if (dominant === 'forgiving') return 'B';
+    if (dominant === 'copycat') return 'A';
+    const f = c.forgiving || 0, cp = c.copycat || 0;
+    return f >= cp ? 'B' : 'A';
+  }
+  if (lesson.id === 8) {
+    if (dominant === 'copycat') return 'B';
     if (coopRate > 0.55) return 'A';
-    if (dominant === 'copycat' && coopRate < 0.35) return 'B';
     return 'C';
   }
-  if (lesson.id === 12) {
+  if (lesson.id === 13) {
     const conf = c.conformist || 0;
     if (conf >= N * 0.85 && coopRate < 0.2) return 'B';
     if (coopRate > 0.5) return 'A';
     return 'C';
   }
-  if (lesson.id === 13) {
+  if (lesson.id === 14) {
     const f = c.firm_but_fair || 0;
     const g = c.grudger || 0;
     const ch = c.cheater || 0;
@@ -400,7 +419,7 @@ function pickWinner(lesson, result) {
     if (f < 6 && (g > f || ch > f)) return 'B';
     return 'C';
   }
-  if (lesson.id === 14) {
+  if (lesson.id === 15) {
     const entries = Object.entries(c).sort((a, b) => b[1] - a[1]);
     if (entries.length < 2) return 'A';
     const spread = entries[0][1] - entries[1][1];
@@ -410,7 +429,7 @@ function pickWinner(lesson, result) {
     if (role === 'cheater') return 'B';
     return 'C';
   }
-  if (lesson.id === 9) {
+  if (lesson.id === 10) {
     if (dominant === 'cheater') return 'C';
     if (dominant === 'detective') return 'A';
     if (dominant === 'cooperator') return 'B';
@@ -419,20 +438,20 @@ function pickWinner(lesson, result) {
     if (top && top[0] === 'detective') return 'A';
     return 'B';
   }
-  if (lesson.id === 10) {
+  if (lesson.id === 11) {
     if (dominant === 'cheater') return 'C';
     if (dominant === 'copycat') return 'B';
     if (dominant === 'pavlov') return 'A';
     return 'C';
   }
-  if (lesson.id === 11) {
+  if (lesson.id === 12) {
     const p = c.prober || 0;
     if (p >= 3) return 'B';
     return 'A';
   }
   const roleToOpt = {
     cooperator: 'A', cheater: 'B', copycat: 'A', sucker: 'A', generous_copycat: 'B',
-    detective: 'A', pavlov: 'A', conformist: 'B', firm_but_fair: 'A', prober: 'B'
+    forgiving: 'B', detective: 'A', pavlov: 'A', conformist: 'B', firm_but_fair: 'A', prober: 'B'
   };
   if (lesson.id === 4 && dominant === 'cooperator') return 'C';
   if (tied.length > 1) return 'C';
@@ -463,7 +482,7 @@ function simulateLesson(lesson) {
     const n = wins[key] || (key === 'A' && wins.tie14 ? 0 : 0);
     optionPct[key] = Math.round(((wins[key] || 0) / TRIALS) * 1000) / 10;
   }
-  if (lesson.id === 14) {
+  if (lesson.id === 15) {
     optionPct.A = Math.round(((wins.A || 0) / TRIALS) * 1000) / 10;
     optionPct.B = Math.round(((wins.B || 0) / TRIALS) * 1000) / 10;
     optionPct.C = Math.round(((wins.C || 0) / TRIALS) * 1000) / 10;
