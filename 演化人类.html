@@ -58,6 +58,13 @@
     .quick-btns, .preset-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; max-width: 720px; margin: 0.6rem 0; }
     .preset-btns .btn { font-size: 0.75rem; padding: 0.4rem 0.65rem; }
     .noise-row { margin: 1rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    .sandbox-intro {
+      max-width: 720px; margin: 0 auto 1.25rem; padding: 1rem 1.15rem;
+      font-size: 0.92rem; line-height: 1.8; color: #b2bec3; text-align: left;
+      background: rgba(22, 33, 62, 0.65); border-radius: 10px;
+      border-left: 3px solid var(--accent);
+    }
+    .sandbox-intro .highlight { color: #ff7675; font-weight: 600; }
     #screen-game { padding: 0; justify-content: flex-start; }
     #btn-esc {
       position: fixed; top: 10px; right: calc(var(--panel-w) + 12px); z-index: 50;
@@ -599,7 +606,8 @@
   </div>
 
   <div id="screen-count" class="screen">
-    <h2>选择参与者人数</h2>
+    <h2>感染演变 · 选择参与者人数</h2>
+    <p class="sandbox-intro">我想你已经体验过了<span class="highlight">课堂模式</span>，你也会发现给出的故事似乎并不一定就会奏效。但在这里，你拥有了更大的设定权限；在更大的、更多人的、更多变数的、更能拟真的系统中，你将能更真实地体会到现实的演变——因为当基数足够大的时候，就很难再出现「关键的少数高影响群体莫名其妙死亡」所造成的戏剧性转折。更大的基数、更复杂的群体，还有每个人可能会犯错（手滑）、可能会误判（误解），而这都将是你可以在此尝试模拟的棋盘。</p>
     <div class="count-row" style="display:flex;gap:0.5rem;align-items:center">
       <label for="count-input">人数：</label>
       <input type="number" id="count-input" min="1" max="36" value="10">
