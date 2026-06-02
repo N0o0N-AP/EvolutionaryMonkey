@@ -419,6 +419,8 @@
     }
     #screen-game.classroom-mode .classroom-bar { display: flex; }
     .classroom-bar label { font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem; }
+    .classroom-bar-right { margin-left: auto; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    #btn-anim-speed.active-speed { border-color: #00cec9; color: #00cec9; }
     #btn-classroom-exit { font-size: 0.8rem; }
 
     /* ===== Reveal modal ===== */
@@ -440,6 +442,11 @@
     #reveal-modal .reveal-feedback { text-align: center; font-size: 1.05rem; margin-bottom: 1.25rem; }
     #reveal-modal .reveal-feedback.correct { color: #00b894; }
     #reveal-modal .reveal-feedback.wrong { color: #ff7675; }
+    #reveal-modal .reveal-sim-stats {
+      font-size: 0.72rem; line-height: 1.55; color: #95a5a6; margin: 0 0 1rem;
+      padding: 0.65rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px;
+      border-left: 2px solid #636e72; white-space: pre-line;
+    }
     #reveal-modal .reveal-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
     #btn-evolve.reveal-ready { animation: pulse-evolve 1.2s ease infinite; }
 
@@ -469,6 +476,38 @@
       margin-bottom: 1.5rem; line-height: 1.5;
     }
     #btn-reveal-next:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .noise-warning-box {
+      margin: 1.2rem auto 0.5rem; padding: 0.7rem 1rem;
+      border-left: 3px solid #ff7675; background: rgba(255, 118, 117, 0.08);
+      color: #ff7675; font-size: 0.92rem; line-height: 1.6;
+      border-radius: 0 6px 6px 0; max-width: 600px;
+    }
+    .noise-warning-box strong { color: #fab1a0; }
+    .noise-hint-inline {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%; background: #ff7675;
+      color: #1a1a2e; font-size: 11px; cursor: help; font-weight: bold;
+      margin-left: 0.3rem; vertical-align: middle;
+    }
+    .noise-tag {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.15rem 0.45rem; border-radius: 4px;
+      font-size: 0.72rem; font-weight: 600; color: #ff7675;
+      background: rgba(255, 118, 117, 0.12);
+      border: 1px solid rgba(255, 118, 117, 0.35);
+      animation: noise-blink 2s ease infinite;
+    }
+    @keyframes noise-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .noise-tag .q-mark {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #ff7675; color: #1a1a2e; font-size: 9px;
+      cursor: help; font-weight: bold;
+    }
 
     #prediction-timer-wrap { display: flex; justify-content: center; margin: 0.75rem 0 1.25rem; }
     #prediction-timer {
@@ -573,7 +612,8 @@
       <button type="button" class="btn btn-secondary quick-count" data-n="36">36 人</button>
     </div>
     <button type="button" class="btn btn-secondary" id="btn-sandbox-rules" style="margin:0.5rem 0">查看游戏规则</button>
-    <label class="noise-row"><input type="checkbox" id="noise-toggle"> 开启噪声（5% 误触）</label>
+    <label class="noise-row"><input type="checkbox" id="noise-action-toggle"> 开启手滑（5% 行动失误）</label>
+    <label class="noise-row"><input type="checkbox" id="noise-perception-toggle"> 开启误解（5% 记忆偏差）</label>
     <p style="font-size:0.8rem;color:#888;margin-bottom:0.5rem">预设阵容（按当前人数裁剪/填充）</p>
     <div class="preset-btns" id="preset-btns"></div>
     <button type="button" class="btn btn-primary" id="btn-generate" style="margin-top:1rem">生成圆环</button>
@@ -583,17 +623,25 @@
     <button type="button" id="btn-esc" title="菜单 Esc">ESC</button>
     <div id="game-topbar"><span id="round-display">准备阶段</span></div>
     <div class="classroom-bar" id="classroom-bar">
+      <div id="classroom-noise-tags" style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;"></div>
       <label><input type="checkbox" id="classroom-auto"> 自动演变</label>
       <button type="button" class="btn btn-tool" id="btn-classroom-pause" style="display:none">暂停</button>
       <button type="button" class="btn btn-tool" id="btn-classroom-skip">跳过动画</button>
       <button type="button" class="btn btn-tool" id="btn-classroom-exit">退出到地图</button>
       <button type="button" class="btn btn-tool" id="btn-classroom-rules">规则回顾</button>
+      <div class="classroom-bar-right">
+        <button type="button" class="btn btn-tool" id="btn-classroom-burst">快速连跑3轮</button>
+        <button type="button" class="btn btn-tool" id="btn-anim-speed" data-anim-speed-btn>动画加快×1</button>
+      </div>
     </div>
     <div id="tool-bar">
+      <div id="sandbox-noise-tags" style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;width:100%;margin-bottom:0.25rem;"></div>
       <button type="button" class="btn btn-tool" id="btn-clear">清空圆环</button>
       <button type="button" class="btn btn-tool" id="btn-random">随机填充</button>
       <button type="button" class="btn btn-tool" id="btn-game-rules">游戏规则</button>
       <label class="noise-row" style="font-size:0.78rem;margin:0"><input type="checkbox" id="immigration-toggle" checked> 外部移民</label>
+      <button type="button" class="btn btn-tool" id="btn-sandbox-burst">快速连跑3轮</button>
+      <button type="button" class="btn btn-tool" id="btn-anim-speed-sandbox" data-anim-speed-btn>动画加快×1</button>
     </div>
     <div id="arena-wrap">
       <div id="arena">
@@ -647,6 +695,7 @@
       <hr class="reveal-divider">
       <p class="reveal-ask">你猜对了吗？</p>
       <p class="reveal-feedback" id="reveal-feedback"></p>
+      <p class="reveal-sim-stats" id="reveal-sim-stats" hidden></p>
       <div class="reveal-actions">
         <button type="button" class="btn btn-secondary" id="btn-reveal-map">返回地图</button>
         <button type="button" class="btn btn-secondary" id="btn-reveal-replay">再玩一次</button>
@@ -820,7 +869,8 @@ class GameState {
     this.roundScores = [];
     this.cumulativeScores = [];
     this.scoreHistory = [];
-    this.noiseEnabled = false;
+    this.actionNoise = 0;
+    this.perceptionNoise = 0;
     this.immigrationEnabled = true;
     this.histories = new Map();
     this.grudgeMap = new Map();
@@ -883,7 +933,8 @@ class GameState {
       roundScores: this.roundScores.map(r => [...r]),
       cumulativeScores: [...this.cumulativeScores],
       scoreHistory: this.scoreHistory.map(h => [...h]),
-      noiseEnabled: this.noiseEnabled,
+      actionNoise: this.actionNoise,
+      perceptionNoise: this.perceptionNoise,
       immigrationEnabled: this.immigrationEnabled,
       histories: [...this.histories.entries()],
       grudgeMap: [...this.grudgeMap.entries()]
@@ -898,7 +949,10 @@ class GameState {
     this.cumulativeScores = data.cumulativeScores || Array(this.playerCount).fill(0);
     this.scoreHistory = (data.scoreHistory || []).map(h => [...h]);
     while (this.scoreHistory.length < this.playerCount) this.scoreHistory.push([]);
-    this.noiseEnabled = !!data.noiseEnabled;
+    if (data.actionNoise != null) this.actionNoise = data.actionNoise;
+    else if (data.noiseEnabled) this.actionNoise = 0.05;
+    else this.actionNoise = 0;
+    this.perceptionNoise = data.perceptionNoise != null ? data.perceptionNoise : 0;
     this.immigrationEnabled = data.immigrationEnabled !== false;
     this.histories = new Map(data.histories || []);
     this.grudgeMap = new Map(data.grudgeMap || []);
@@ -1031,12 +1085,12 @@ class StrategyLogic {
     return 'C';
   }
 
-  static conformistAction(playerIndex, state) {
+  static conformistAction(playerIndex, state, perceptionNoise = 0) {
     if (state.round === 0) return 'C';
     const L = state.left(playerIndex);
     const R = state.right(playerIndex);
-    const hL = state.getHistory(playerIndex, L);
-    const hR = state.getHistory(playerIndex, R);
+    const hL = NoiseUI.applyPerceptionNoise(state.getHistory(playerIndex, L), perceptionNoise);
+    const hR = NoiseUI.applyPerceptionNoise(state.getHistory(playerIndex, R), perceptionNoise);
     const lastL = hL.length ? hL[hL.length - 1].oppAction : 'C';
     const lastR = hR.length ? hR[hR.length - 1].oppAction : 'C';
     let d = 0, c = 0;
@@ -1058,9 +1112,63 @@ class StrategyLogic {
     return '#e17055';
   }
 
-  static applyNoise(action) {
-    if (Math.random() < 0.05) return action === 'C' ? 'D' : 'C';
-    return action;
+}
+
+/* ===== NoiseUI ===== */
+class NoiseUI {
+  static ACTION_HINT = '模拟真实情况：人偶尔会「手滑」——本想合作却按成了背叛，或反之。系统无法区分这是失误还是故意，邻居会按看到的动作报复。';
+  static PERCEPTION_HINT = '模拟真实情况：人偶尔会「误解」——你明明合作了，对方却记成了背叛。基于错误的记忆做出报复，引发冤罪螺旋。';
+
+  static applyPerceptionNoise(history, rate) {
+    if (!rate || !history.length) return history;
+    return history.map(h => {
+      if (Math.random() < rate) {
+        return { ...h, oppAction: h.oppAction === 'C' ? 'D' : 'C' };
+      }
+      return h;
+    });
+  }
+
+  static applyActionNoise(action, rate) {
+    if (!rate || Math.random() >= rate) return action;
+    return action === 'C' ? 'D' : 'C';
+  }
+
+  static renderWarnings(lesson, container) {
+    if (!container) return;
+    container.querySelectorAll('.noise-warning-box').forEach(el => el.remove());
+    const lines = [];
+    const a = lesson.actionNoise || 0;
+    const p = lesson.perceptionNoise || 0;
+    if (a > 0) {
+      lines.push(`<span style="color:#ff7675;font-weight:bold">⚠ 本关特殊规则：</span>行动失误率 ${(a * 100).toFixed(0)}% <span class="noise-hint-inline" title="${NoiseUI.ACTION_HINT}">?</span>`);
+    }
+    if (p > 0) {
+      lines.push(`<span style="color:#ff7675;font-weight:bold">⚠ 本关特殊规则：</span>记忆误解率 ${(p * 100).toFixed(0)}% <span class="noise-hint-inline" title="${NoiseUI.PERCEPTION_HINT}">?</span>`);
+    }
+    if (lines.length) {
+      const box = document.createElement('div');
+      box.className = 'noise-warning-box';
+      box.innerHTML = lines.join('<br>');
+      container.appendChild(box);
+    }
+  }
+
+  static renderTags(box, actionNoise, perceptionNoise) {
+    if (!box) return;
+    box.innerHTML = '';
+    if (actionNoise > 0) {
+      const tag = document.createElement('span');
+      tag.className = 'noise-tag';
+      tag.innerHTML = `⚡ ${(actionNoise * 100).toFixed(0)}% 手滑 <span class="q-mark" title="${NoiseUI.ACTION_HINT}">?</span>`;
+      box.appendChild(tag);
+    }
+    if (perceptionNoise > 0) {
+      const tag = document.createElement('span');
+      tag.className = 'noise-tag';
+      tag.innerHTML = `👁 ${(perceptionNoise * 100).toFixed(0)}% 误解 <span class="q-mark" title="${NoiseUI.PERCEPTION_HINT}">?</span>`;
+      box.appendChild(tag);
+    }
   }
 }
 
@@ -1080,6 +1188,34 @@ class EvolutionEngine {
     return diff > 0 ? p : (1 - p);
   }
 
+  static speedMult = 1;
+
+  static animMs(ms) {
+    return Math.max(16, Math.round(ms / EvolutionEngine.speedMult));
+  }
+
+  static cycleSpeed() {
+    EvolutionEngine.speedMult = EvolutionEngine.speedMult >= 3 ? 1 : EvolutionEngine.speedMult + 1;
+    return EvolutionEngine.speedMult;
+  }
+
+  static updateSpeedButtons() {
+    const label = `动画加快×${EvolutionEngine.speedMult}`;
+    document.querySelectorAll('[data-anim-speed-btn]').forEach(el => {
+      el.textContent = label;
+      el.classList.toggle('active-speed', EvolutionEngine.speedMult > 1);
+    });
+  }
+
+  static autoIntervalMs() {
+    return Math.max(200, Math.round(800 / EvolutionEngine.speedMult));
+  }
+
+  static resetAnimSpeed() {
+    EvolutionEngine.speedMult = 1;
+    EvolutionEngine.updateSpeedButtons();
+  }
+
   constructor(state, circle) {
     this.state = state;
     this.circle = circle;
@@ -1093,22 +1229,26 @@ class EvolutionEngine {
       const N = this.state.playerCount;
     const actions = Array.from({ length: N }, () => ({}));
     const grudgeCtx = { grudgeMap: new Map(this.state.grudgeMap), playerIndex: 0 };
+    const aNoise = opts.actionNoise != null ? opts.actionNoise : (this.state.actionNoise || 0);
+    const pNoise = opts.perceptionNoise != null ? opts.perceptionNoise : (this.state.perceptionNoise || 0);
 
     for (let i = 0; i < N; i++) {
       if (!this.state.nodes[i]) continue;
       grudgeCtx.playerIndex = i;
       const role = this.state.nodes[i];
       if (role === 'conformist') {
-        const act = StrategyLogic.conformistAction(i, this.state);
+        let act = StrategyLogic.conformistAction(i, this.state, pNoise);
+        act = NoiseUI.applyActionNoise(act, aNoise);
         actions[i][this.state.left(i)] = act;
         actions[i][this.state.right(i)] = act;
         continue;
       }
       for (const j of [this.state.left(i), this.state.right(i)]) {
         if (!this.state.nodes[j]) continue;
-        const hist = this.state.getHistory(i, j);
+        const rawHist = this.state.getHistory(i, j);
+        const hist = NoiseUI.applyPerceptionNoise(rawHist, pNoise);
         let act = StrategyLogic.decide(role, j, hist, this.state.round, grudgeCtx);
-        if (this.state.noiseEnabled) act = StrategyLogic.applyNoise(act);
+        act = NoiseUI.applyActionNoise(act, aNoise);
         actions[i][j] = act;
       }
     }
@@ -1158,8 +1298,8 @@ class EvolutionEngine {
       }
       this.state.pushRoundScores(scores);
 
-      // 每满 7 人淘汰 1 人：7→1，14→2，21→3；不足 7 人时仍至少淘汰 1 人
-      const deathCount = Math.max(1, Math.floor(N / 7));
+      // 每满 6 个在场者淘汰 1 人：6→1，12→2，18→3；不足 6 人时仍至少淘汰 1 人
+      const deathCount = Math.max(1, Math.floor(N / 6));
       const immortal = new Set(opts.immortalIndices || []);
       const deathCandidates = [...Array(N).keys()].filter(i => this.state.nodes[i] && !immortal.has(i));
       const actualDeathCount = deathCandidates.length
@@ -1309,7 +1449,7 @@ class EvolutionEngine {
     return new Set(arr.slice(0, count));
   }
 
-  delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+  delay(ms) { return new Promise(r => setTimeout(r, EvolutionEngine.animMs(ms))); }
 }
 
 /* ===== CircleRenderer ===== */
@@ -1465,7 +1605,7 @@ class CircleRenderer {
       line.classList.add('line-fade');
       svg.appendChild(line);
     }
-    if (edges.length) setTimeout(() => { svg.innerHTML = ''; }, 850);
+    if (edges.length) setTimeout(() => { svg.innerHTML = ''; }, EvolutionEngine.animMs(850));
   }
 
   showFloatScores(scores) {
@@ -1478,14 +1618,14 @@ class CircleRenderer {
       if (s < 0) el.classList.add('neg');
       if (s === 0) el.classList.add('zero');
       this.slotEls[i].appendChild(el);
-      setTimeout(() => el.remove(), 820);
+      setTimeout(() => el.remove(), EvolutionEngine.animMs(820));
     }
   }
 
   rotateRing() {
     const c = this.refs.circleContainer;
     c.style.transform = 'rotate(5deg)';
-    setTimeout(() => { c.style.transform = 'rotate(0deg)'; }, 300);
+    setTimeout(() => { c.style.transform = 'rotate(0deg)'; }, EvolutionEngine.animMs(300));
   }
 
   animateDeath(index) {
@@ -1493,7 +1633,7 @@ class CircleRenderer {
       const slot = this.slotEls[index];
       if (!slot) { resolve(); return; }
       slot.classList.add('dying');
-      setTimeout(() => { slot.classList.remove('dying', 'filled', 'has-score'); slot.querySelector('.ball-wrap').innerHTML = ''; delete slot.dataset.strategy; resolve(); }, 550);
+      setTimeout(() => { slot.classList.remove('dying', 'filled', 'has-score'); slot.querySelector('.ball-wrap').innerHTML = ''; delete slot.dataset.strategy; resolve(); }, EvolutionEngine.animMs(550));
     });
   }
 
@@ -1502,7 +1642,7 @@ class CircleRenderer {
       const slot = this.slotEls[index];
       if (!slot) { resolve(); return; }
       slot.classList.add('replace-die');
-      setTimeout(() => { slot.classList.remove('replace-die'); resolve(); }, 500);
+      setTimeout(() => { slot.classList.remove('replace-die'); resolve(); }, EvolutionEngine.animMs(500));
     });
   }
 
@@ -1511,7 +1651,7 @@ class CircleRenderer {
       this.setSlotStrategy(index, roleId, false);
       const slot = this.slotEls[index];
       slot.classList.add('birthing');
-      setTimeout(() => { slot.classList.remove('birthing'); resolve(); }, 550);
+      setTimeout(() => { slot.classList.remove('birthing'); resolve(); }, EvolutionEngine.animMs(550));
     });
   }
 
@@ -1532,7 +1672,7 @@ class CircleRenderer {
     line.setAttribute('class', 'competition-line');
     line.style.animation = 'comp-line-fade 0.6s ease forwards';
     svg.appendChild(line);
-    setTimeout(() => { if (line.parentNode) line.remove(); }, 620);
+    setTimeout(() => { if (line.parentNode) line.remove(); }, EvolutionEngine.animMs(620));
   }
 
   animateImmigration(index, roleId) {
@@ -1544,7 +1684,7 @@ class CircleRenderer {
       setTimeout(() => {
         slot.classList.remove('immigrant-mutate');
         resolve();
-      }, 650);
+      }, EvolutionEngine.animMs(650));
     });
   }
 
@@ -1552,7 +1692,7 @@ class CircleRenderer {
     const arena = this.refs.arena;
     if (!arena) return;
     arena.classList.add('immigration-pulse');
-    setTimeout(() => arena.classList.remove('immigration-pulse'), 380);
+    setTimeout(() => arena.classList.remove('immigration-pulse'), EvolutionEngine.animMs(380));
   }
 }
 
@@ -1825,117 +1965,117 @@ class LessonConfig {
   }
 
   static lessons = [
-    { id:1, name:'寄生', themeColor:'#FF6B6B', playerCount:4, radiusHint:160, immortalIndices:[3], forcedNoise:false, targetRounds:8, editable:false,
+    { id:1, name:'寄生', themeColor:'#FF6B6B', playerCount:4, radiusHint:160, immortalIndices:[3], actionNoise:0,perceptionNoise:0, targetRounds:20, editable:false,
       storyBg:['一个闭塞的山谷果园，4 户人家围泉而居。3 户「老好人」日出而作，把收成分给左右邻居；1 户「投机者」住在泉眼边（索引 3），从不播种，只等左右两家送粮来时全部私吞。','你是路过的游商，坐在山顶观察这个村子。冲突在于：投机者同时剥削两个方向，每轮净赚，而老好人们每轮净亏。'],
       cast:[{role:'cooperator',storyName:'老好人',count:3},{role:'cheater',storyName:'投机者',count:1}],
       preplaced:[{role:'cooperator',count:3,positions:[0,1,2]},{role:'cheater',count:1,positions:[3]}],
-      question:'8 轮后，山谷里哪种家庭最多？',
+      question:'20 轮后，山谷里哪种家庭最多？',
       options:[{id:'A',label:'老好人',roleRef:'cooperator',isCorrect:false},{id:'B',label:'投机者',roleRef:'cheater',isCorrect:true},{id:'C',label:'一样多',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：投机者吃光了果园', revealStory:'投机者像水蛭一样吸干了泉眼两侧的血液。老好人 A 在第 3 轮破产，他的房子空出来，被投机者的后代占据——因为投机者得分最高。8 轮后你再看，山谷里只剩投机者的旗帜。',
+      revealTitle:'结局：投机者吃光了果园', revealStory:'投机者像水蛭一样吸干了泉眼两侧的血液。老好人 A 在第 3 轮破产，他的房子空出来，被投机者的后代占据——因为投机者得分最高。20 轮后你再看，山谷里只剩投机者的旗帜。',
       revealTheory:'纯粹的善良如果没有防御机制，就等于在群体中悬挂「欢迎剥削」的招牌。这就是寄生——个体理性导致集体悲剧。' },
-    { id:2, name:'城墙', themeColor:'#74B9FF', playerCount:6, radiusHint:180, immortalIndices:[], forcedNoise:false, targetRounds:10, editable:false,
+    { id:2, name:'城墙', themeColor:'#74B9FF', playerCount:6, radiusHint:180, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:25, editable:false,
       storyBg:['北方边境 6 座烽火台围成一圈。4 座是「复仇者」（复读机），遵守血誓：你帮我点火，我帮你点火；你背叛我，我下一轮必以箭雨回击。2 座是「逃兵」（骗子），收到求援后永远不发兵，只坐收渔利。','你是朝廷派来的监察史，手持令箭站在中央高台。逃兵 1 号夹在复仇者 0 与 2 之间；逃兵 4 号夹在复仇者 3 与 5 之间——两个逃兵试图吃两边空饷。'],
       cast:[{role:'copycat',storyName:'复仇者',count:4},{role:'cheater',storyName:'逃兵',count:2}],
       preplaced:[{role:'copycat',count:4,positions:[0,2,3,5]},{role:'cheater',count:2,positions:[1,4]}],
-      question:'10 轮后，边境线上存活的大多数是？',
+      question:'25 轮后，边境线上存活的大多数是？',
       options:[{id:'A',label:'复仇者',roleRef:'copycat',isCorrect:true},{id:'B',label:'逃兵',roleRef:'cheater',isCorrect:false},{id:'C',label:'两败俱伤',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：逃兵被互惠法则淘汰', revealStory:'逃兵 1 号私吞了第一批军饷，但下一轮，左右两座烽火台的箭矢同时对准了他。他每骗一次，就要同时承受两侧的报复。10 轮后，逃兵的烽火台熄灭了——不是被朝廷斩首，而是被边境的互惠法则自然淘汰。',
-      revealTheory:'当互惠策略形成包围圈时，剥削者无处可逃。这不是道德的胜利，而是数学的围剿——背叛的代价太高了。' },
-    { id:3, name:'理想城', themeColor:'#FF6B6B', playerCount:8, radiusHint:200, immortalIndices:[7], forcedNoise:false, targetRounds:12, editable:false,
-      storyBg:['南方平原上 8 座白色尖塔围成「理想城」，塔中住的是「圣人」（合作者），签订契约：永不设防，资源共享。第 7 号塔（泉眼塔）在签约前混进了一个「病毒」（骗子），他微笑着签字，心里计划着白嫖。','你是契约的公证人，手持羊皮卷站在圆环中央。病毒每轮从左右两座圣塔榨取资源，圣人们遵守契约，从不反击。'],
+      revealTitle:'结局：复仇者守住多半边境', revealStory:'逃兵 1 号私吞了第一批军饷，但下一轮，左右两座烽火台的箭矢同时对准了他。他每骗一次，就要同时承受两侧的报复。25 轮后，熄灭的逃兵烽火台不在少数，但仍有漏网之鱼——互惠法则守住了多半边境，却不是每一次都完美围剿。',
+      revealTheory:'当互惠策略形成包围圈时，剥削者很难扩张，却未必被清零。背叛的代价很高，但随机沉船与适应度竞争会给逃兵留下喘息。道德围剿在演化里常见，却不绝对。' },
+    { id:3, name:'理想城', themeColor:'#FF6B6B', playerCount:8, radiusHint:200, immortalIndices:[7], actionNoise:0,perceptionNoise:0, targetRounds:30, editable:false,
+      storyBg:['南方平原上 8 座白色尖塔围成「理想城」，塔中住的是「圣人」（合作者），签订契约：永不设防，资源共享。第 7 号塔（泉眼塔）在签约前混进了一个「病毒」（骗子）——他受规则庇护难以被清除，却未必能抢走每一座空塔。','你是契约的公证人，手持羊皮卷站在圆环中央。病毒每轮仍在榨取邻居，但圣人接盘空塔时适应度往往更稳。谁能占据多数席位，才是这座城真正的颜色。'],
       cast:[{role:'cooperator',storyName:'圣人',count:7},{role:'cheater',storyName:'病毒',count:1}],
       preplaced:[{role:'cooperator',count:7,positions:[0,1,2,3,4,5,6]},{role:'cheater',count:1,positions:[7]}],
-      question:'12 轮后，这座城的主流居民是？',
-      options:[{id:'A',label:'圣人',roleRef:'cooperator',isCorrect:false},{id:'B',label:'病毒',roleRef:'cheater',isCorrect:true},{id:'C',label:'奇迹般维持',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：乌托邦只维持了数轮', revealStory:'第 3 轮，病毒从 1 个变成了 3 个——被榨干的圣人塔空出来，被病毒的后代占据。第 7 轮，白色尖塔开始染灰。12 轮后你展开羊皮卷，发现城徽已经变成了病毒的图腾。',
-      revealTheory:'完美的善良是癌细胞的温床。只需一个背叛者，就能摧毁整个合作生态。这就是乌托邦悖论。' },
-    { id:4, name:'防火墙', themeColor:'#00cec9', playerCount:8, radiusHint:200, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      question:'30 轮后，这座城的主流居民是？',
+      options:[{id:'A',label:'圣人',roleRef:'cooperator',isCorrect:true},{id:'B',label:'病毒',roleRef:'cheater',isCorrect:false},{id:'C',label:'奇迹般维持',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：病毒没能吞下理想城', revealStory:'病毒从泉眼塔榨取了两轮资源，圣人的塔却一座接一座在空地上被「近期表现更好」的圣人后裔接盘。零号病人虽因免疫规则始终不死，却挤不进死亡-出生的繁殖赛。30 轮后你展开羊皮卷：白色尖塔仍是多数，病毒被困在边缘，像一颗拔不掉的刺，却没能改写城邦的颜色。',
+      revealTheory:'完美的善良在演化中未必立刻灭绝，但会给背叛者留下窗口。当唯一病毒无法通过繁殖扩散时，乌托邦会畸形地延续——圣人仍是主流，隐患却从未消失。' },
+    { id:4, name:'防火墙', themeColor:'#00cec9', playerCount:8, radiusHint:200, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['理想城沦陷后，北方建立 8 座要塞：5 座由「警卫」（复读机）驻守，2 座由「平民」（合作者）居住，1 座缺口（索引 3）被「间谍」（骗子）趁夜潜入。间谍的左右要塞（索引 2 和 4）恰好都是警卫。','你是要塞指挥官，站在瞭望塔上。警卫的规则是：你对我开火，我下一轮必还击；你对我友好，我下一轮必回礼。间谍试图骗取补给，但反击机制已经启动——即使他侥幸未被随机死亡抽中，得分也永远低于两侧警卫。'],
       cast:[{role:'copycat',storyName:'警卫',count:5},{role:'cooperator',storyName:'平民',count:2},{role:'cheater',storyName:'间谍',count:1}],
       preplaced:[{role:'copycat',count:5,positions:[0,1,2,4,5]},{role:'cooperator',count:2,positions:[6,7]},{role:'cheater',count:1,positions:[3]}],
-      question:'15 轮后，间谍能成功繁殖吗？哪种人最多？',
+      question:'38 轮后，间谍能成功繁殖吗？哪种人最多？',
       options:[{id:'A',label:'警卫（复读机）',roleRef:'copycat',isCorrect:true},{id:'B',label:'间谍',roleRef:'cheater',isCorrect:false},{id:'C',label:'平民',roleRef:'cooperator',isCorrect:false}],
-      revealTitle:'结局：背叛的成本高于收益', revealStory:'间谍第 1 轮骗到了补给，但第 2 轮，左右两座要塞同时切断了他的粮道。他每骗一次，就要付出双倍的封锁代价。即使他活着，得分也永远挤不进前 50%。15 轮后，要塞的缺口被高分的警卫自然填补——互惠策略不需要主动出击，只需要让背叛的成本高于收益。',
+      revealTitle:'结局：背叛的成本高于收益', revealStory:'间谍第 1 轮骗到了补给，但第 2 轮，左右两座要塞同时切断了他的粮道。他每骗一次，就要付出双倍的封锁代价。即使他活着，得分也永远挤不进前 50%。38 轮后，要塞的缺口被高分的警卫自然填补——互惠策略不需要主动出击，只需要让背叛的成本高于收益。',
       revealTheory:'互惠策略形成防火墙，不是消灭威胁，而是让威胁的繁殖成本太高。合作者需要「带牙齿的同伴」才能生存。' },
-    { id:5, name:'冤大头', themeColor:'#96CEB4', playerCount:8, radiusHint:200, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
-      storyBg:['东海渔港，8 艘渔船围港停泊，一船冤大头、一船强盗交错泊靠。冤大头永远先交货后收钱；强盗永远收货后赖账。渔港没有衙门，交易全凭口头约定。','你是港口的记账先生，每天黄昏统计盈亏。单看账本，强盗每轮白嫖得分更高，冤大头每轮净亏——可渔港还有一条规矩：随机沉船后，空码头由左右邻居按「近期表现」（最近几轮盈亏）掷骰竞争接盘，不是谁刚赢一局谁必胜。'],
+    { id:5, name:'冤大头', themeColor:'#96CEB4', playerCount:8, radiusHint:200, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
+      storyBg:['东海渔港，8 艘渔船围港停泊，一船冤大头、一船强盗交错泊靠。冤大头永远先交货后收钱；强盗永远收货后赖账。渔港没有衙门，交易全凭口头约定。','你是港口的记账先生，每天黄昏统计盈亏。单看账本，强盗每轮白嫖得分更高；可沉船之后，空码头由左右邻居按「近期适应度」掷骰竞争接盘——谁更能撑过这一轮，谁就能插旗。'],
       cast:[{role:'sucker',storyName:'冤大头',count:4},{role:'cheater',storyName:'强盗',count:4}],
       preplaced:[{role:'sucker',count:4,positions:'even'},{role:'cheater',count:4,positions:'odd'}],
-      question:'15 轮后，港口里谁占主导？',
-      options:[{id:'A',label:'冤大头',roleRef:'sucker',isCorrect:true},{id:'B',label:'强盗',roleRef:'cheater',isCorrect:false},{id:'C',label:'互相制衡',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：黑旗与白帆在港口共存', revealStory:'你原以为强盗会吃光港口——毕竟他们每轮都赚得更多。可演变开始后，规律反过来了：强盗船一旦沉没，两侧往往只剩冤大头，空位只能被冤大头接盘；冤大头沉了，两侧强盗又会把黑旗插上去。15 轮后你清点泊位：冤大头往往更多，至少也与强盗势均力敌；强盗没有灭绝，却再也无法独占渔港。',
-      revealTheory:'单轮得分最低，不等于演化中注定灭绝。交错泊港时，空位竞争看的是近期适应度而非某一局的爆发；强盗虽常赢单轮，却未必在掷骰繁殖中占尽优势。冤大头用「接盘」机制活了下来——无条件的信任依然危险，但演化不会简单惩罚每一种善良。' },
-    { id:6, name:'以牙还牙', themeColor:'#FFEAA7', playerCount:12, radiusHint:240, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      question:'38 轮后，港口里谁占主导？',
+      options:[{id:'A',label:'冤大头',roleRef:'sucker',isCorrect:false},{id:'B',label:'强盗',roleRef:'cheater',isCorrect:true},{id:'C',label:'互相制衡',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：黑旗渐渐压过白帆', revealStory:'单轮账本永远是强盗好看，但演化比账本长。冤大头沉船后，两侧强盗常把空位染黑；可强盗一旦翻船，旁边往往只剩得分更稳的冤大头来接盘。拉锯多轮之后，适应度与随机沉船叠加，黑旗泊位还是越来越多。38 轮后你清点：强盗略占上风，冤大头没有绝迹，却再难主导渔港。',
+      revealTheory:'单轮高分不等于演化胜利。交错泊港下，适应度竞争会让「偶尔吃亏的人」也有繁殖机会，但长期仍可能输给更会榨取的一方。无条件的信任依然危险——它未必立刻灭绝，却很难统治港口。' },
+    { id:6, name:'以牙还牙', themeColor:'#FFEAA7', playerCount:12, radiusHint:240, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
       storyBg:['西域商道，12 个驼队围成休息圈：8 支「镜子人」商队扎堆扎营，4 支「沙匪」散在对面。商道上没有王法，只有规矩：你敬我一尺，我敬你一丈；你捅我一刀，我必还你一箭。','你是客栈掌柜，在篝火旁冷眼旁观。沙匪抢得了一时便宜，但镜子人会立刻报复；更关键的是，戈壁上的沉船不算多——多数时候，只有熬得过报复、还能与同伴互助的驼队，才配接盘空出来的营地。'],
       cast:[{role:'copycat',storyName:'镜子人',count:8},{role:'cheater',storyName:'沙匪',count:4}],
       preplaced:[{role:'copycat',count:8,positions:[0,1,2,3,4,5,10,11]},{role:'cheater',count:4,positions:[6,7,8,9]}],
-      question:'20 轮后，商道上哪方会赢？',
+      question:'50 轮后，商道上哪方会赢？',
       options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'沙匪',roleRef:'cheater',isCorrect:false},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：驼铃压过沙匪的口哨', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮起左右都是竖起的箭垛。镜子人彼此合作得分更稳，沙匪要么在报复中得分归零，要么倒在随机沉船后把营地让给邻居。20 轮后你再看：镜子人的驼队占了大半休息圈，沙匪只剩零星几支还在苟延——报复没有消灭他们，却让合作成了主流。',
+      revealTitle:'结局：驼铃压过沙匪的口哨', revealStory:'沙匪头子第 1 轮抢了一笔，但第 2 轮起左右都是竖起的箭垛。镜子人彼此合作得分更稳，沙匪要么在报复中得分归零，要么倒在随机沉船后把营地让给邻居。50 轮后你再看：镜子人的驼队占了大半休息圈，沙匪只剩零星几支还在苟延——报复没有消灭他们，却让合作成了主流。',
       revealTheory:'当背叛会招致报复时，背叛就不再划算。减少无意义的沉船、让互助者有机会接盘，镜子人就能在演化中占优。报复能力不是暴力，而是让「合作」成为理性选择的信用背书。' },
-    { id:7, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:true, targetRounds:15, editable:false,
+    { id:7, name:'误伤', themeColor:'#e17055', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['10 个镜子人围坐在「诚信酒馆」，发誓以牙还牙。但地板年久失修，每轮有 5% 的概率有人滑倒，手里的酒杯「意外」泼到邻居脸上——看起来像背叛，实则是失误。没有道歉机制，镜子人只看行动。','你是酒馆角落里弹琵琶的盲眼乐师，听见了每一次「背叛」背后的惊呼。一次滑倒引发的「背叛」，会触发报复，进而引发报复的报复……'],
       cast:[{role:'copycat',storyName:'镜子人',count:10}],
       preplaced:[{role:'copycat',count:10,positions:'all'}],
-      question:'15 轮后，这群人还能合作吗？主流状态是？',
+      question:'38 轮后，这群人还能合作吗？主流状态是？',
       options:[{id:'A',label:'继续合作',roleRef:null,isCorrect:false},{id:'B',label:'互相背叛/仇恨螺旋',roleRef:'copycat',isCorrect:true},{id:'C',label:'一半一半',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：诚信酒馆变成仇杀酒馆', revealStory:'第 3 轮，靠门的镜子人滑倒了。第 4 轮，他的邻居报复了他。第 5 轮，邻居的邻居也拔出了刀……你听见琵琶弦一根根崩断，就像信任在碎裂。15 轮后，诚信酒馆变成了仇杀酒馆。',
+      revealTitle:'结局：诚信酒馆变成仇杀酒馆', revealStory:'第 3 轮，靠门的镜子人滑倒了。第 4 轮，他的邻居报复了他。第 5 轮，邻居的邻居也拔出了刀……你听见琵琶弦一根根崩断，就像信任在碎裂。38 轮后，诚信酒馆变成了仇杀酒馆。',
       revealTheory:'没有宽容的互惠，一次噪声就能引发永恒的仇恨螺旋。噪声是合作最隐蔽的杀手。' },
-    { id:8, name:'灭火器', themeColor:'#FDCB6E', playerCount:10, radiusHint:220, immortalIndices:[], forcedNoise:true, targetRounds:15, editable:false,
-      storyBg:['诚信酒馆隔壁开了「宽宏客栈」，7 个镜子人搬来，与 3 个「宽宏者」（大善人）混住。宽宏者 90% 以牙还牙，10% 选择原谅——「算了，他可能只是滑倒了」。地板同样年久失修，5% 误触仍在发生。','你是两家酒馆的房东，手持钥匙站在中间。当仇恨链即将形成时，宽宏者的「算了」像剪刀一样剪断链条。'],
+    { id:8, name:'灭火器', themeColor:'#FDCB6E', playerCount:10, radiusHint:220, immortalIndices:[], actionNoise:0.05,perceptionNoise:0.05, targetRounds:38, editable:false,
+      storyBg:['诚信酒馆地板年久失修（5% 手滑），灯光昏暗（5% 误解）。7 个镜子人 + 3 个宽宏者混住在「宽宏客栈」。宽宏者愿意原谅「你真的背叛了我」，也愿意原谅「我以为你背叛了你」。','你是两家酒馆的房东，手持钥匙站在中间。噪声会点燃仇恨链，但谁能占满更多空位，还要看适应度竞争——人数多的镜子人，未必输给更宽容的人。'],
       cast:[{role:'copycat',storyName:'镜子人',count:7},{role:'generous_copycat',storyName:'宽宏者',count:3}],
       preplaced:[{role:'copycat',count:7,positions:[0,1,2,3,4,5,6]},{role:'generous_copycat',count:3,positions:[7,8,9]}],
-      question:'开启噪声后 15 轮，谁能阻止仇恨螺旋？',
-      options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:false},{id:'B',label:'宽宏者',roleRef:'generous_copycat',isCorrect:true},{id:'C',label:'谁也阻止不了',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：宽宏客栈灯火通明', revealStory:'第 6 轮，仇恨链再次启动，但宽宏者 9 号突然放下了刀：「算了，他上次帮过我七次。」镜子人 2 号愣在原地，刀悬在半空。15 轮后，宽宏客栈的灯火通明，而诚信酒馆早已人去楼空。',
-      revealTheory:'偶尔原谅不是软弱，而是打破死循环的灭火器。宽容是复杂系统中不可或缺的稳定阀。' },
-    { id:9, name:'侦探事务所', themeColor:'#FF7675', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      question:'在手滑与误解之下 38 轮，谁能阻止仇恨螺旋？',
+      options:[{id:'A',label:'镜子人',roleRef:'copycat',isCorrect:true},{id:'B',label:'宽宏者',roleRef:'generous_copycat',isCorrect:false},{id:'C',label:'谁也阻止不了',roleRef:null,isCorrect:false}],
+      revealTitle:'结局：宽宏者没能守住客栈', revealStory:'误解与手滑把诚信酒馆变成了仇杀酒馆，搬到隔壁的宽宏者本想灭火，却人少势孤。镜子人彼此报复时得分起伏大，空位竞争里往往是抱团、得分更稳的镜子人后裔占满营地。38 轮后，宽宏客栈只剩零星几盏灯，圆环上绝大多数仍是镜子人——他们会原谅，也会记仇，但繁殖的速度更快。',
+      revealTheory:'偶尔原谅能打断仇恨链，却不保证在演化中胜出。当互惠者数量占优、又遭遇噪声时，「更会复制」的镜子人往往压过「更愿原谅」的宽宏者。宽容是稳定阀，不是必胜保证。' },
+    { id:9, name:'侦探事务所', themeColor:'#FF7675', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
       storyBg:['维多利亚风格的 12 人圆桌侦探俱乐部。4 个「侦探」戴猎鹿帽，4 个「老实人」（合作者）捧茶杯，4 个「惯犯」（骗子）藏在阴影里。侦探前 4 轮是试用期：合作-背叛-合作-合作；4 轮后，若曾被背叛则变镜子人，若从未被背叛则变骗子。','你是俱乐部主席，手持怀表计时。侦探们像变色龙一样分化——面对老实人他们变黑，面对惯犯他们变白。'],
       cast:[{role:'detective',storyName:'侦探',count:4},{role:'cooperator',storyName:'老实人',count:4},{role:'cheater',storyName:'惯犯',count:4}],
       preplaced:[{role:'detective',count:4,positions:[0,3,6,9]},{role:'cooperator',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
-      question:'20 轮后，谁最成功？',
-      options:[{id:'A',label:'侦探',roleRef:'detective',isCorrect:true},{id:'B',label:'老实人',roleRef:'cooperator',isCorrect:false},{id:'C',label:'惯犯',roleRef:'cheater',isCorrect:false}],
-      revealTitle:'结局：侦探占据七个座位', revealStory:'4 轮试用期结束，面对老实人的侦探摘下了猎鹿帽，露出了骗子的獠牙；面对惯犯的侦探则系紧了领带，变成了最冷酷的复仇者。20 轮后，你清点人数：侦探们占据了 7 个座位——他们从未坚守原则，却永远站在赢家那边。',
-      revealTheory:'信息就是生存力。先试探再决策，比盲目信任或盲目背叛走得更远。适应性策略在混合环境中具有演化优势。' },
-    { id:10, name:'变色龙', themeColor:'#A29BFE', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:20, editable:false,
+      question:'50 轮后，谁最成功？',
+      options:[{id:'A',label:'侦探',roleRef:'detective',isCorrect:false},{id:'B',label:'老实人',roleRef:'cooperator',isCorrect:false},{id:'C',label:'惯犯',roleRef:'cheater',isCorrect:true}],
+      revealTitle:'结局：惯犯在混局中坐大', revealStory:'侦探的试用期很精彩：对老实人变骗子，对惯犯变复读机。但死亡-出生拼的是近期适应度，惯犯每轮榨取更狠，空位竞争里黑影扩张最快。老实人最先大量出局，侦探席位被蚕食。50 轮后，圆桌边上惯犯最多——他们未必最聪明，却最会占便宜。',
+      revealTheory:'适应性策略能短期分化，却不保证长期占座。在混合博弈里，单纯背叛者若持续拿到高分，仍可能在繁殖竞争中压制「先试探再变形」的侦探。信息优势要转化为繁殖优势，才算演化成功。' },
+    { id:10, name:'变色龙', themeColor:'#A29BFE', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, editable:false,
       storyBg:['热带雨林，12 只动物围水潭而居。4 只「变色龙」（墙头草）只看输赢调整肤色；4 只「镜子鸟」（复读机）以牙还牙；4 只「毒蛇」（骗子）永远偷袭。雨季食物匮乏，每轮必须选择与左邻或右邻共享或抢夺领地。','你是蹲在树上的博物学家，手持望远镜。镜子鸟与毒蛇陷入死斗，变色龙却根据上一轮的得分随时切换阵营。'],
       cast:[{role:'pavlov',storyName:'变色龙',count:4},{role:'copycat',storyName:'镜子鸟',count:4},{role:'cheater',storyName:'毒蛇',count:4}],
       preplaced:[{role:'pavlov',count:4,positions:[0,3,6,9]},{role:'copycat',count:4,positions:[1,4,7,10]},{role:'cheater',count:4,positions:[2,5,8,11]}],
-      question:'20 轮后，谁能适应三方混战？',
-      options:[{id:'A',label:'变色龙',roleRef:'pavlov',isCorrect:true},{id:'B',label:'镜子鸟',roleRef:'copycat',isCorrect:false},{id:'C',label:'毒蛇',roleRef:'cheater',isCorrect:false}],
-      revealTitle:'结局：水潭边只剩变色龙', revealStory:'镜子鸟被毒蛇咬死后，变色龙立刻变成毒蛇的颜色；当毒蛇互相残杀时，变色龙又变成合作者的颜色。20 轮后，你放下望远镜——水潭边只剩变色龙，它们身上同时倒映着三种颜色。',
-      revealTheory:'不坚守原则，只坚守利益——在动荡环境中，「赢存输变」的自适应性，比道德或强硬更重要。' },
-    { id:11, name:'猎手与猎物', themeColor:'#636E72', playerCount:12, radiusHint:250, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+      question:'50 轮后，谁能适应三方混战？',
+      options:[{id:'A',label:'变色龙',roleRef:'pavlov',isCorrect:false},{id:'B',label:'镜子鸟',roleRef:'copycat',isCorrect:false},{id:'C',label:'毒蛇',roleRef:'cheater',isCorrect:true}],
+      revealTitle:'结局：毒蛇在混战中略占上风', revealStory:'镜子鸟与毒蛇互相消耗，变色龙见风使舵，三方得分胶着。多轮沉船之后，近期得分更稳、更敢背叛的毒蛇在空位竞争里略胜一筹。50 轮后，水潭边三种颜色都在，但毒蛇的鳞片最多——墙头草没有消失，只是没能笑到最后。',
+      revealTheory:'「赢存输变」在三方混战中未必第一。当背叛者单轮收益高、又能撑过报复链时，繁殖竞争仍可能让骗子略占上风。灵活不是唯一演化优势，高分剥削同样有效。' },
+    { id:11, name:'猎手与猎物', themeColor:'#636E72', playerCount:12, radiusHint:250, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['北方雪原，12 个帐篷围成猎营。3 个「猎手」（试探者）骑着黑狼，其余 9 个是「肥羊」（傻子），只会低头吃草。猎手第 1 轮必定偷袭试探；若肥羊不反击，则判定为猎物，永久压榨；若反击，则切换为镜子模式。','你是营火旁的萨满，能听懂狼语。猎手们像手术刀一样精准识别软柿子，对硬茬子则立刻装成盟友。'],
       cast:[{role:'prober',storyName:'猎手',count:3},{role:'sucker',storyName:'肥羊',count:9}],
       preplaced:[{role:'prober',count:3,positions:[0,4,8]},{role:'sucker',count:9,positions:'remaining'}],
-      question:'15 轮后，猎手会？',
+      question:'38 轮后，猎手会？',
       options:[{id:'A',label:'被肥羊的善良感化',roleRef:null,isCorrect:false},{id:'B',label:'识别软柿子并统治群体',roleRef:'prober',isCorrect:true},{id:'C',label:'同归于尽',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：猎手建立剥削王朝', revealStory:'猎手 0 号第 1 轮咬了肥羊 1 号，肥羊 1 号只是咩咩叫了两声。猎手 0 号的狼眼亮了：「猎物确认。」15 轮后，3 个猎手各自建立了剥削王朝，肥羊们的帐篷里只剩下啃光的骨头。',
-      revealTheory:'策略性剥削：先刺探，再决定是否永久压榨。不反击的善良，就是猎物。识别对手的反击能力，是生存的第一课。' },
-    { id:12, name:'瘟疫', themeColor:'#00B894', playerCount:24, radiusHint:280, immortalIndices:[0], forcedNoise:false, targetRounds:10, editable:false,
+      revealTitle:'结局：三匹狼活到最后', revealStory:'猎手 0 号第 1 轮咬了肥羊 1 号，肥羊只是咩咩叫了两声——猎物确认。雪原上肥羊帐篷仍占多数，可那 3 顶狼帐每轮沉船都躲过一劫，适应度在剥削中居高不下。38 轮后，你数了数：肥羊换了一茬又一茬，猎手还是 3 个，却个个存活——他们统治的不是人口，而是秩序。',
+      revealTheory:'策略性剥削：先刺探，再决定是否永久压榨。不反击的善良会成为猎物，但猎物可以很多、狼却很少——演化看的是谁更能活下来并霸占高分繁殖，不是谁数量多。' },
+    { id:12, name:'瘟疫', themeColor:'#00B894', playerCount:24, radiusHint:280, immortalIndices:[0], actionNoise:0,perceptionNoise:0, targetRounds:25, editable:false,
       storyBg:['南方盲从部落，24 个帐篷围成圣圈。23 个「盲从者」（跟风狗）没有主见，只看左右邻居上一轮做什么，自己就跟着做。1 个「零号病人」（骗子）在祭坛边打了个喷嚏——他第 1 轮就选择了背叛。盲从者们以为零号病人在执行某种新仪式。','你是部落外的游医，被挡在圣圈外观察。零号病人背叛后，左右两个盲从者下一轮也背叛；这两个盲从者又影响各自的另一个邻居……'],
       cast:[{role:'cheater',storyName:'零号病人',count:1},{role:'conformist',storyName:'盲从者',count:23}],
       preplaced:[{role:'cheater',count:1,positions:[0]},{role:'conformist',count:23,positions:'remaining'}],
-      question:'10 轮后，这个部落的主流行为是？',
+      question:'25 轮后，这个部落的主流行为是？',
       options:[{id:'A',label:'合作互助',roleRef:null,isCorrect:false},{id:'B',label:'互相欺骗/背叛',roleRef:'conformist',isCorrect:true},{id:'C',label:'保持混乱',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：背叛之火燃遍圣圈', revealStory:'第 1 轮，零号病人背叛了。第 2 轮，他的两个邻居跟着背叛。第 3 轮，4 个帐篷挂起了黑旗……你看着背叛像瘟疫一样沿着圣圈蔓延，10 轮后，24 个帐篷全部燃起了背叛之火。零号病人站在祭坛上大笑——他从未被治愈，因为他就是瘟疫本身。',
+      revealTitle:'结局：背叛之火燃遍圣圈', revealStory:'第 1 轮，零号病人背叛了。第 2 轮，他的两个邻居跟着背叛。第 3 轮，4 个帐篷挂起了黑旗……你看着背叛像瘟疫一样沿着圣圈蔓延，25 轮后，24 个帐篷全部燃起了背叛之火。零号病人站在祭坛上大笑——他从未被治愈，因为他就是瘟疫本身。',
       revealTheory:'没有主见的人，是病毒最好的宿主。空间结构会放大微小扰动——一个骗子就能通过盲从者毁灭整个群体。' },
-    { id:13, name:'调解员', themeColor:'#E17055', playerCount:24, radiusHint:280, immortalIndices:[], forcedNoise:false, targetRounds:15, editable:false,
+    { id:13, name:'调解员', themeColor:'#E17055', playerCount:24, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:38, editable:false,
       storyBg:['西部荒野，24 个矿坑围成决斗场。8 个「死仇者」（记仇者）与 8 个「强盗」（骗子）世代血仇，中间夹着 8 个「调解员」（和事佬）。死仇者被骗一次就终身追杀；调解员被骗后只报复一轮，然后原谅。','你是酒馆老板娘，给三方卖酒，冷眼旁观。死仇者与强盗陷入无限死循环，调解员试图在中间「只打一拳就握手」。'],
       cast:[{role:'grudger',storyName:'死仇者',count:8},{role:'cheater',storyName:'强盗',count:8},{role:'firm_but_fair',storyName:'调解员',count:8}],
       preplaced:[{role:'grudger',count:8,positions:'everyThird'},{role:'cheater',count:8,positions:'everyThirdOffset1'},{role:'firm_but_fair',count:8,positions:'everyThirdOffset2'}],
-      question:'15 轮后，调解员能阻止血仇吗？',
-      options:[{id:'A',label:'能，仇恨被平息',roleRef:'firm_but_fair',isCorrect:true},{id:'B',label:'不能，调解员被双方消灭',roleRef:null,isCorrect:false},{id:'C',label:'三方继续混战',roleRef:null,isCorrect:false}],
-      revealTitle:'结局：调解员的酒馆座无虚席', revealStory:'死仇者 3 号与强盗 4 号互相射了 7 轮，弹药用尽，双双饿死。调解员 5 号曾经被强盗骗过，但他只回了一枪，然后递上了一杯威士忌。15 轮后，调解员的酒馆座无虚席，而死仇者与强盗的坟头已经长满了野草。',
-      revealTheory:'有限报复 vs 无限报复。只报复一轮就原谅，是修复破碎关系的唯一方式。调解不是软弱，而是切断仇恨螺旋的手术刀。' },
-    { id:14, name:'终局', themeColor:'#dfe6e9', playerCount:36, radiusHint:280, immortalIndices:[], forcedNoise:false, targetRounds:20, anyAnswerCorrect:true, editable:false,
+      question:'38 轮后，调解员能阻止血仇吗？',
+      options:[{id:'A',label:'能，仇恨被平息',roleRef:'firm_but_fair',isCorrect:false},{id:'B',label:'不能，调解员被双方消灭',roleRef:null,isCorrect:false},{id:'C',label:'三方继续混战',roleRef:null,isCorrect:true}],
+      revealTitle:'结局：酒馆还在，仇却未消', revealStory:'调解员确实只回一枪就递威士忌，但死仇者与强盗的世仇太深，三方在沉船与繁殖中此消彼长，谁也吃不了整桌席。38 轮后，矿坑边仍是三种旗帜交错：调解员没有绝迹，却也没能让血仇熄火——僵局本身就是答案。',
+      revealTheory:'有限报复能缓解一对矛盾，却无法在多方混战中自动胜出。当记仇者与骗子数量相当，和事佬往往只能维持胶着，而非一家独大。调解是手术刀，不是万能和平协议。' },
+    { id:14, name:'终局', themeColor:'#dfe6e9', playerCount:36, radiusHint:280, immortalIndices:[], actionNoise:0,perceptionNoise:0, targetRounds:50, anyAnswerCorrect:true, editable:false,
       storyBg:['帝国议会，36 个席位围成圆桌。12 个「镜子议员」（复读机）、12 个「阴谋家」（骗子）、12 个「侦探大臣」三方割据。没有皇帝，只有永恒的博弈。','你是史官，手持毛笔记录这一切。三方在前线僵持，没有任何一方能彻底消灭另一方。'],
       cast:[{role:'copycat',storyName:'镜子议员',count:12},{role:'cheater',storyName:'阴谋家',count:12},{role:'detective',storyName:'侦探大臣',count:12}],
       preplaced:[{role:'copycat',count:12,positions:'everyThird'},{role:'cheater',count:12,positions:'everyThirdOffset1'},{role:'detective',count:12,positions:'everyThirdOffset2'}],
-      question:'20 轮后，谁会统治这个社会？（本关无标准答案）',
+      question:'50 轮后，谁会统治这个社会？（本关无标准答案）',
       options:[{id:'A',label:'互惠派（复读机）',roleRef:'copycat',isCorrect:true},{id:'B',label:'背叛派（骗子）',roleRef:'cheater',isCorrect:true},{id:'C',label:'信息派（侦探）',roleRef:'detective',isCorrect:true}],
-      revealTitle:'结局：帝国没有胜利者', revealStory:'20 轮后，你放下毛笔，发现三方席位数量几乎没变。镜子议员守住了防线，阴谋家偶尔突破，侦探大臣根据风向切换阵营。帝国没有胜利者，只有永恒的角力。',
+      revealTitle:'结局：帝国没有胜利者', revealStory:'50 轮后，你放下毛笔，发现三方席位数量几乎没变。镜子议员守住了防线，阴谋家偶尔突破，侦探大臣根据风向切换阵营。帝国没有胜利者，只有永恒的角力。',
       revealTheory:'真实世界没有终极胜利者。合作、背叛与信息，三种力量永远角力。理解它们的平衡，就是理解了社会的本质。' }
   ];
 }
@@ -2102,9 +2242,9 @@ class GameRules {
       <p>每人每轮与两名邻居各玩一局，<strong>本轮得分 = 两局得分之和</strong>（可正可负）。</p>
       <h3>每一轮「演变」会发生什么</h3>
       <ul>
-        <li><strong>博弈</strong>：按各角色策略与历史，决定对每名邻居出「合作」或「背叛」；部分关卡开启 5%「误触」，可能随机反转你的选择。</li>
+        <li><strong>博弈</strong>：按各角色策略与历史决定对每名邻居出「合作」或「背叛」。<strong>手滑</strong>：执行时 5% 概率动作被反转（实际发生并记入历史）。<strong>误解</strong>：读取邻居历史时 5% 概率记错对方动作（仅影响本次决策，不篡改真实记录）。</li>
         <li><strong>计分</strong>：结算得分，圆环上出现连线颜色（双合作绿、双背叛红、一方吃亏橙）与飘字得分。</li>
-        <li><strong>死亡</strong>：每满 <strong>7</strong> 人随机淘汰 <strong>1</strong> 人（14 人淘汰 2 人，21 人淘汰 3 人，以此类推）；人数不足 7 时仍至少淘汰 1 人，变为空位。</li>
+        <li><strong>死亡</strong>：每满 <strong>6</strong> 个在场者随机淘汰 <strong>1</strong> 人（12 人淘汰 2 人，18 人淘汰 3 人，以此类推）；不足 6 人时仍至少淘汰 1 人，变为空位。</li>
         <li><strong>适应度</strong>：记录最近 <strong>5 轮</strong>得分，适应度 = <strong>1 + 近期平均分</strong>（开局前几轮按已有轮数平均）。累计分用于展示，也体现长期表现。</li>
         <li><strong>出生</strong>：空位由左右方向<strong>最近存活者</strong>竞争；按双方适应度之差查表决定胜率（差 1 分约 55%，差 2 分约 70%，差 3 分以上约 82%～99.5%）。胜者策略复制到空位，并继承其近期得分记忆。</li>
         <li><strong>外部移民</strong>（感染演变可关闭）：每轮结束后，约 2% 的存活者可能被强制替换为「合作者」或「混沌」。经典课堂不触发。</li>
@@ -2244,7 +2384,9 @@ class StorySequence {
     this.showAct('story-bg');
     document.getElementById('story-bg-title').textContent = lesson.name;
     document.getElementById('story-bg-title').style.color = lesson.themeColor;
-    document.getElementById('story-bg-body').innerHTML = lesson.storyBg.map(p => `<p>${p}</p>`).join('');
+    const body = document.getElementById('story-bg-body');
+    body.innerHTML = lesson.storyBg.map(p => `<p>${p}</p>`).join('');
+    NoiseUI.renderWarnings(lesson, body);
   }
   showAct(id) {
     document.querySelectorAll('.story-act').forEach(el => el.classList.toggle('active', el.id === id));
@@ -2272,6 +2414,7 @@ class StorySequence {
       item.appendChild(beh);
       row.appendChild(item);
     });
+    NoiseUI.renderWarnings(this.lesson, document.getElementById('story-cast'));
   }
   clearTimer() {
     if (this.timerInterval) {
@@ -2381,6 +2524,38 @@ class StorySequence {
   }
 }
 
+/** 2000 次蒙特卡洛，规则与游戏一致（死亡 1/6、适应度繁殖等）。由 simulate-lessons.mjs 生成 */
+const LESSON_SIM_STATS = {"1":{"trials":2000,"optionPct":{"A":0.5,"B":97.4,"C":2.1},"avgShare":{"cheater":98,"cooperator":2.1},"avgCoopInteractPct":0.9,"avgDefectInteractPct":99.1,"monoEarlyPct":93.9},"2":{"trials":2000,"optionPct":{"A":59,"B":33.4,"C":7.7},"avgShare":{"copycat":61.6,"cheater":38.4},"avgCoopInteractPct":10.4,"avgDefectInteractPct":89.6,"monoEarlyPct":71.7},"3":{"trials":2000,"optionPct":{"A":78.7,"B":7.8,"C":13.6},"avgShare":{"cooperator":66.3,"cheater":33.7},"avgCoopInteractPct":54.1,"avgDefectInteractPct":45.9,"monoEarlyPct":0.4},"4":{"trials":2000,"optionPct":{"A":47.3,"B":3.8,"C":49},"avgShare":{"copycat":54.7,"cooperator":37.6,"cheater":7.7},"avgCoopInteractPct":74.8,"avgDefectInteractPct":25.2,"monoEarlyPct":34.6},"5":{"trials":2000,"optionPct":{"A":35.4,"B":55.4,"C":9.2},"avgShare":{"cheater":62.4,"sucker":37.6},"avgCoopInteractPct":28.4,"avgDefectInteractPct":71.6,"monoEarlyPct":56.1},"6":{"trials":2000,"optionPct":{"A":93.8,"B":2.9,"C":3.4},"avgShare":{"copycat":90.3,"cheater":9.7},"avgCoopInteractPct":48.3,"avgDefectInteractPct":51.7,"monoEarlyPct":70.2},"7":{"trials":2000,"optionPct":{"A":99.9,"B":0,"C":0.1},"avgShare":{"copycat":100},"avgCoopInteractPct":90.4,"avgDefectInteractPct":9.6,"monoEarlyPct":100},"8":{"trials":2000,"optionPct":{"A":66.5,"B":18.4,"C":15.1},"avgShare":{"copycat":64.7,"generous_copycat":35.3},"avgCoopInteractPct":32.6,"avgDefectInteractPct":67.4,"monoEarlyPct":15},"9":{"trials":2000,"optionPct":{"A":30.5,"B":31.7,"C":37.9},"avgShare":{"cheater":41.5,"detective":30.1,"cooperator":28.4},"avgCoopInteractPct":30.8,"avgDefectInteractPct":69.2,"monoEarlyPct":39.7},"10":{"trials":2000,"optionPct":{"A":49.7,"B":27.4,"C":22.9},"avgShare":{"pavlov":43.6,"copycat":28.3,"cheater":28.1},"avgCoopInteractPct":44.8,"avgDefectInteractPct":55.2,"monoEarlyPct":39.4},"11":{"trials":2000,"optionPct":{"A":58.7,"B":41.4,"C":0},"avgShare":{"sucker":76.6,"prober":23.4},"avgCoopInteractPct":68.7,"avgDefectInteractPct":31.3,"monoEarlyPct":54.1},"12":{"trials":2000,"optionPct":{"A":0,"B":100,"C":0},"avgShare":{"conformist":95.8,"cheater":4.2},"avgCoopInteractPct":0,"avgDefectInteractPct":100,"monoEarlyPct":0},"13":{"trials":2000,"optionPct":{"A":31.7,"B":33.9,"C":34.4},"avgShare":{"firm_but_fair":34.4,"cheater":33.1,"grudger":32.5},"avgCoopInteractPct":10.2,"avgDefectInteractPct":89.8,"monoEarlyPct":2.2},"14":{"trials":2000,"optionPct":{"A":23.7,"B":15.3,"C":39.3,"tie":21.8},"avgShare":{"detective":41.8,"copycat":31.6,"cheater":26.7},"avgCoopInteractPct":19.3,"avgDefectInteractPct":80.7,"monoEarlyPct":0.8}};
+
+const SIM_ROLE_LABELS = {
+  cooperator:'合作者', cheater:'骗子', copycat:'复读机', sucker:'冤大头', grudger:'记仇者',
+  detective:'侦探', pavlov:'墙头草', generous_copycat:'宽宏复读机', conformist:'跟风者',
+  firm_but_fair:'和事佬', prober:'试探者'
+};
+
+class LessonSimStats {
+  static format(lesson) {
+    const s = LESSON_SIM_STATS[lesson.id];
+    if (!s) return '';
+    const lines = [];
+    lines.push(`教育参考 · ${s.trials} 次蒙特卡洛模拟（规则与当前游戏一致：每 6 人淘汰 1、适应度繁殖、无移民等；你亲手玩的每一局仍会有随机差异）。`);
+    const optParts = lesson.options.map(o => `${o.id}「${o.label}」约 ${s.optionPct[o.id] ?? 0}%`);
+    lines.push(`若按终局「人数最多的策略类型」归类预测：${optParts.join(' · ')}`);
+    const shareParts = Object.entries(s.avgShare)
+      .sort((a, b) => b[1] - a[1])
+      .map(([r, p]) => `${SIM_ROLE_LABELS[r] || r} 平均占 ${p}% 席位`);
+    lines.push(`终局场上平均席位：${shareParts.join(' · ')}`);
+    lines.push(`终局一轮邻接互动：双方合作约 ${s.avgCoopInteractPct}% · 至少一方背叛约 ${s.avgDefectInteractPct}%`);
+    if (s.monoEarlyPct >= 15) lines.push(`未满目标回合即单一策略统治：约 ${s.monoEarlyPct}%`);
+    if (lesson.id === 14 && s.optionPct.tie != null)
+      lines.push(`终局三方人数差距≤3（胶着）：约 ${s.optionPct.tie}%`);
+    const correct = lesson.options.find(o => o.isCorrect);
+    if (correct && !lesson.anyAnswerCorrect && (s.optionPct[correct.id] ?? 0) < 40)
+      lines.push(`说明：本关推荐答案为「${correct.label}」，但上表「归类预测」命中率较低——故事强调机制直觉，模拟则按终局人数/互动统计；二者可对照讨论。`);
+    return lines.join('\n');
+  }
+}
+
 class RevealModal {
   constructor(refs, app) {
     this.refs = refs;
@@ -2409,6 +2584,15 @@ class RevealModal {
     } else {
       fb.className = 'reveal-feedback wrong';
       fb.textContent = '✗ 大多数人第一次都会猜错——这正是博弈论反直觉的地方。';
+    }
+    const simEl = document.getElementById('reveal-sim-stats');
+    const simText = LessonSimStats.format(lesson);
+    if (simText) {
+      simEl.textContent = simText;
+      simEl.hidden = false;
+    } else {
+      simEl.textContent = '';
+      simEl.hidden = true;
     }
     ClassroomProgress.markComplete(lesson.id, !isCorrect && !lesson.anyAnswerCorrect);
     const nextBtn = document.getElementById('btn-reveal-next');
@@ -2468,9 +2652,9 @@ class ClassroomGameController {
     this.lesson = lesson;
     this.betOption = lesson.options[betIndex];
     this.stopAuto();
+    EvolutionEngine.resetAnimSpeed();
     const nodes = LessonConfig.buildNodes(lesson);
     this.state.reset(lesson.playerCount);
-    this.state.noiseEnabled = !!lesson.forcedNoise;
     nodes.forEach((r, i) => { this.state.nodes[i] = r; });
 
     this.refs.screenGame.classList.add('classroom-mode');
@@ -2486,6 +2670,7 @@ class ClassroomGameController {
     this.setEvolveButtonState();
     this.bindClassroomControls();
     this.bindClassroomTooltips();
+    this.renderNoiseTags();
   }
 
   renderCodex() {
@@ -2545,6 +2730,13 @@ class ClassroomGameController {
 
   updateRoundUI() {
     this.refs.roundDisplay.textContent = `第 ${this.state.round} 轮 / 共 ${this.lesson.targetRounds} 轮`;
+    this.renderNoiseTags();
+  }
+
+  renderNoiseTags() {
+    const lesson = this.lesson;
+    if (!lesson) return;
+    NoiseUI.renderTags(document.getElementById('classroom-noise-tags'), lesson.actionNoise || 0, lesson.perceptionNoise || 0);
   }
 
   setEvolveButtonState() {
@@ -2583,6 +2775,33 @@ class ClassroomGameController {
       if (!this.paused) this.startAuto();
       else this.stopAuto();
     };
+    document.getElementById('btn-classroom-burst').onclick = () => this.burstThreeRounds();
+    document.getElementById('btn-anim-speed').onclick = () => {
+      EvolutionEngine.cycleSpeed();
+      EvolutionEngine.updateSpeedButtons();
+      if (autoCb.checked && !this.paused) this.startAuto();
+    };
+  }
+
+  async burstThreeRounds() {
+    if (this.evolution.running) return;
+    if (this.state.round >= this.lesson.targetRounds || GameState.monocultureRole(this.state)) {
+      this.finishLesson();
+      return;
+    }
+    this.stopAuto();
+    for (let i = 0; i < 3; i++) {
+      if (this.evolution.running) return;
+      if (this.state.round >= this.lesson.targetRounds || GameState.monocultureRole(this.state)) break;
+      AudioManager.get().playEvolveClick();
+      await this.runOneRound(false);
+      if (GameState.monocultureRole(this.state)) {
+        this.finishLesson();
+        return;
+      }
+      if (this.state.round >= this.lesson.targetRounds) break;
+    }
+    this.setEvolveButtonState();
   }
 
   async onEvolveClick() {
@@ -2612,7 +2831,9 @@ class ClassroomGameController {
     await this.evolution.runRound({
       fast,
       immortalIndices: this.lesson.immortalIndices || [],
-      enableImmigration: false
+      enableImmigration: false,
+      actionNoise: this.lesson.actionNoise || 0,
+      perceptionNoise: this.lesson.perceptionNoise || 0
     });
     this.updateRoundUI();
     this.circle.evolutionRunning = false;
@@ -2637,7 +2858,7 @@ class ClassroomGameController {
         return;
       }
       this.onEvolveClick();
-    }, 800);
+    }, EvolutionEngine.autoIntervalMs());
   }
 
   stopAuto() {
@@ -2652,6 +2873,7 @@ class ClassroomGameController {
 
   teardown() {
     this.stopAuto();
+    EvolutionEngine.resetAnimSpeed();
     AudioManager.get().stopBGM();
     if (this._evolveHandler) this.refs.btnEvolve.removeEventListener('click', this._evolveHandler);
     this.refs.screenGame.classList.remove('classroom-mode');
@@ -2662,6 +2884,7 @@ class ClassroomGameController {
     document.getElementById('btn-classroom-pause').style.display = 'none';
     this.circle.clearAll();
     this.sandbox.panel.render();
+    NoiseUI.renderTags(document.getElementById('classroom-noise-tags'), 0, 0);
   }
 }
 
@@ -2765,7 +2988,8 @@ class GameLoop {
       btnStart: document.getElementById('btn-start'),
       countInput: document.getElementById('count-input'),
       countHint: document.getElementById('count-hint'),
-      noiseToggle: document.getElementById('noise-toggle'),
+      noiseActionToggle: document.getElementById('noise-action-toggle'),
+      noisePerceptionToggle: document.getElementById('noise-perception-toggle'),
       immigrationToggle: document.getElementById('immigration-toggle'),
       presetBtns: document.getElementById('preset-btns'),
       btnGenerate: document.getElementById('btn-generate'),
@@ -2831,6 +3055,16 @@ class GameLoop {
     r.btnClear.addEventListener('click', () => this.clearRing());
     r.btnRandom.addEventListener('click', () => this.randomFill());
     r.btnGameRules.addEventListener('click', () => GameRules.openModal());
+    if (r.noiseActionToggle) {
+      try {
+        if (localStorage.getItem('trustEvolution_noise_action') === '1') r.noiseActionToggle.checked = true;
+      } catch (_) {}
+    }
+    if (r.noisePerceptionToggle) {
+      try {
+        if (localStorage.getItem('trustEvolution_noise_perception') === '1') r.noisePerceptionToggle.checked = true;
+      } catch (_) {}
+    }
     if (r.immigrationToggle) {
       try {
         const saved = localStorage.getItem('trustEvolution_immigration');
@@ -2854,13 +3088,35 @@ class GameLoop {
     window.addEventListener('resize', () => {
       if (this.state.playerCount && r.screenGame.classList.contains('active')) this.circle.buildRing(false);
     });
+    document.getElementById('btn-sandbox-burst').addEventListener('click', () => this.burstThreeRounds());
+    document.getElementById('btn-anim-speed-sandbox').addEventListener('click', () => {
+      EvolutionEngine.cycleSpeed();
+      EvolutionEngine.updateSpeedButtons();
+    });
+  }
+
+  async burstThreeRounds() {
+    if (!this.state.isFull() || this.evolution.running || this.dominanceEnded) return;
+    for (let i = 0; i < 3; i++) {
+      if (!this.state.isFull() || this.evolution.running || this.dominanceEnded) return;
+      await this.runEvolve();
+      if (this.dominanceEnded) return;
+    }
   }
 
   startGame(n) {
+    EvolutionEngine.resetAnimSpeed();
     this.hideDominanceEnd();
     const preset = this.state.pendingPreset;
     this.state.reset(n);
-    this.state.noiseEnabled = this.refs.noiseToggle.checked;
+    if (this.refs.noiseActionToggle) {
+      this.state.actionNoise = this.refs.noiseActionToggle.checked ? 0.05 : 0;
+      try { localStorage.setItem('trustEvolution_noise_action', this.state.actionNoise ? '1' : '0'); } catch (_) {}
+    }
+    if (this.refs.noisePerceptionToggle) {
+      this.state.perceptionNoise = this.refs.noisePerceptionToggle.checked ? 0.05 : 0;
+      try { localStorage.setItem('trustEvolution_noise_perception', this.state.perceptionNoise ? '1' : '0'); } catch (_) {}
+    }
     if (this.refs.immigrationToggle) {
       this.state.immigrationEnabled = this.refs.immigrationToggle.checked;
       try { localStorage.setItem('trustEvolution_immigration', this.state.immigrationEnabled ? '1' : '0'); } catch (_) {}
@@ -2877,6 +3133,7 @@ class GameLoop {
     if (preset) {
       for (let i = 0; i < n; i++) if (this.state.nodes[i]) this.circle.setSlotStrategy(i, this.state.nodes[i], true);
     }
+    NoiseUI.renderTags(document.getElementById('sandbox-noise-tags'), this.state.actionNoise, this.state.perceptionNoise);
   }
 
   hideDominanceEnd() {
@@ -2901,7 +3158,9 @@ class GameLoop {
     this.refs.btnEvolve.classList.remove('visible');
     this.panel.collapse();
     await this.evolution.runRound({
-      enableImmigration: this.state.immigrationEnabled !== false
+      enableImmigration: this.state.immigrationEnabled !== false,
+      actionNoise: this.state.actionNoise || 0,
+      perceptionNoise: this.state.perceptionNoise || 0
     });
     this.ui.setRoundText(this.state.round);
     this.circle.evolutionRunning = false;
@@ -2948,8 +3207,10 @@ class GameLoop {
         this.save.renderSlotButtons('load', (idx, data) => {
           if (!data) return;
           this.state.deserialize(data);
-          this.refs.noiseToggle.checked = this.state.noiseEnabled;
+          if (this.refs.noiseActionToggle) this.refs.noiseActionToggle.checked = (this.state.actionNoise || 0) > 0;
+          if (this.refs.noisePerceptionToggle) this.refs.noisePerceptionToggle.checked = (this.state.perceptionNoise || 0) > 0;
           if (this.refs.immigrationToggle) this.refs.immigrationToggle.checked = this.state.immigrationEnabled !== false;
+          NoiseUI.renderTags(document.getElementById('sandbox-noise-tags'), this.state.actionNoise, this.state.perceptionNoise);
           this.ui.closeEsc();
           this.ui.showScreen('screen-game');
           this.ui.setRoundText(this.state.round);
